@@ -33,9 +33,19 @@ function displayValue(key,v){
   return text(v) || '—';
 }
 
+function payloadRego(row){
+  return row.rego || text(row.payload?.q4_typeA) || '';
+}
+
+function payloadOdometer(row){
+  if(row.odometer !== null && row.odometer !== undefined && row.odometer !== '') return row.odometer;
+  const raw = text(row.payload?.q40_number);
+  return raw || '—';
+}
+
 function issueList(row){
   const p=row.payload || {};
-  if(!p || Object.keys(p).length<=2 && p.monday_item_id) return [];
+  if(!p || (Object.keys(p).length<=2 && p.monday_item_id)) return [];
   const issues=[];
   const add=(key,label,msg)=>{ if(msg && !issues.some(x=>x.key===key && x.message===msg)) issues.push({key,label,message:msg}); };
   const val=k=>p[k];
@@ -56,7 +66,7 @@ function issueList(row){
     const s=text(v);
     const objOther=typeof v==='object' && !Array.isArray(v) ? text(v.other) : '';
     const selected=Array.isArray(v) ? v.map(x=>String(x).toLowerCase()) : Object.values(v||{}).map(x=>String(x).toLowerCase());
-    if(selected.length && !selected.includes('pass') && !selected.some(x=>x==='yes')) add(key,label,s);
+    if(selected.length && !selected.includes('pass') && !selected.some(x=>x==='yes') && !objOther) add(key,label,s);
     if(objOther && NEGATIVE.test(objOther)) add(key,label,objOther);
     if(typeof v==='string' && NEGATIVE.test(v)) add(key,label,v);
   }
@@ -92,35 +102,81 @@ function escapeHtml(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','
 
 function openModal(row){
   const issues=issueList(row);
-  document.body.insertAdjacentHTML('beforeend',`<div class="compliance-modal-backdrop" id="complianceModal"><div class="compliance-modal"><div class="compliance-head"><div><h3>${row.check_type==='pre_start'?'Pre-start Check':'Post-shift Check'}</h3><p>${escapeHtml(row.driver_name || 'Unknown driver')} · ${escapeHtml(row.rego || 'No vehicle')} · ${escapeHtml(row.check_date || '')}</p></div><button id="closeCompliance">×</button></div><div class="compliance-body">${issues.length?`<div class="issue-summary"><strong>⚠ ${issues.length} compliance issue${issues.length===1?'':'s'} found</strong>${issues.map(i=>`<div><b>${escapeHtml(i.label)}:</b> ${escapeHtml(i.message)}</div>`).join('')}</div>`:'<div class="pass-summary"><strong>✓ No compliance issues detected</strong></div>'}<div class="answers-title">Complete submission</div>${detailRows(row)}</div></div></div>`);
+  document.body.insertAdjacentHTML('beforeend',`<div class="compliance-modal-backdrop" id="complianceModal"><div class="compliance-modal"><div class="compliance-head"><div><h3>${row.check_type==='pre_start'?'Pre-start Check':'Post-shift Check'}</h3><p>${escapeHtml(row.driver_name || 'Unknown driver')} · ${escapeHtml(payloadRego(row) || 'No vehicle')} · ${escapeHtml(row.check_date || '')}</p></div><button id="closeCompliance">×</button></div><div class="compliance-body">${issues.length?`<div class="issue-summary"><strong>⚠ ${issues.length} compliance issue${issues.length===1?'':'s'} found</strong>${issues.map(i=>`<div><b>${escapeHtml(i.label)}:</b> ${escapeHtml(i.message)}</div>`).join('')}</div>`:'<div class="pass-summary"><strong>✓ No compliance issues detected</strong></div>'}<div class="answers-title">Complete submission</div>${detailRows(row)}</div></div></div>`);
   const close=()=>document.querySelector('#complianceModal')?.remove();
   document.querySelector('#closeCompliance').onclick=close;
   document.querySelector('#complianceModal').onclick=e=>{if(e.target.id==='complianceModal') close();};
 }
 
 let decorating=false;
+let rerunRequested=false;
+
 async function decorateChecks(){
-  if(decorating) return;
   const title=document.querySelector('.page-title h1')?.textContent?.trim();
   if(title!=='Daily Vehicle Checks') return;
+
   const table=document.querySelector('.content table');
   if(!table || table.dataset.complianceDecorated==='1') return;
+
+  if(decorating){
+    rerunRequested=true;
+    return;
+  }
+
   decorating=true;
-  const {data:{session}}=await supabase.auth.getSession();
-  if(!session){decorating=false;return;}
-  const {data,error}=await supabase.from('vehicle_checks').select('*').order('created_at',{ascending:false}).limit(500);
-  if(error){decorating=false;return;}
-  const rows=[...table.querySelectorAll('tbody tr')];
-  const head=table.querySelector('thead tr');
-  const th=document.createElement('th'); th.textContent='Compliance'; head.appendChild(th);
-  rows.forEach((tr,i)=>{
-    const row=data?.[i]; if(!row) return;
-    const td=document.createElement('td'); td.innerHTML=statusBadge(row); tr.appendChild(td);
-    tr.classList.add('clickable-check'); tr.title='Open full check'; tr.addEventListener('click',()=>openModal(row));
-  });
-  table.dataset.complianceDecorated='1'; decorating=false;
+  rerunRequested=false;
+
+  try{
+    const {data:{session}}=await supabase.auth.getSession();
+    if(!session) return;
+
+    const {data,error}=await supabase.from('vehicle_checks').select('*').order('created_at',{ascending:false}).limit(500);
+    if(error) return;
+
+    // Refresh causes app.js to replace the whole table while this async query is running.
+    // Never decorate a detached/stale table. Re-run against the new live table instead.
+    const liveTable=document.querySelector('.content table');
+    if(!table.isConnected || liveTable!==table){
+      rerunRequested=true;
+      return;
+    }
+
+    const rows=[...table.querySelectorAll('tbody tr')];
+    const head=table.querySelector('thead tr');
+    if(!head) return;
+
+    const th=document.createElement('th');
+    th.textContent='Compliance';
+    head.appendChild(th);
+
+    rows.forEach((tr,i)=>{
+      const row=data?.[i];
+      if(!row) return;
+
+      // Keep the visible core values stable even if an older row was initially stored
+      // before the Jotform field mapping was corrected.
+      const cells=tr.querySelectorAll('td');
+      if(cells[3]) cells[3].textContent=payloadRego(row) || '—';
+      if(cells[4]) cells[4].textContent=String(payloadOdometer(row));
+
+      const td=document.createElement('td');
+      td.innerHTML=statusBadge(row);
+      tr.appendChild(td);
+      tr.classList.add('clickable-check');
+      tr.title='Open full check';
+      tr.addEventListener('click',()=>openModal(row));
+    });
+
+    table.dataset.complianceDecorated='1';
+  } finally {
+    decorating=false;
+    if(rerunRequested){
+      rerunRequested=false;
+      setTimeout(decorateChecks,0);
+    }
+  }
 }
 
 const observer=new MutationObserver(()=>decorateChecks());
 observer.observe(document.documentElement,{subtree:true,childList:true});
-setTimeout(decorateChecks,500);
+setTimeout(decorateChecks,300);
