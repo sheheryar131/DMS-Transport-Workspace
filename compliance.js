@@ -39,7 +39,7 @@ function fmtDate(v){
   catch{return v;}
 }
 function payloadRego(row){return row.rego || text(row.payload?.q4_typeA) || '—';}
-function payloadOdo(row){return row.odometer ?? Number(row.payload?.q40_number || 0) || '—';}
+function payloadOdo(row){return (row.odometer ?? Number(row.payload?.q40_number || 0)) || '—';}
 function payloadDriver(row){return row.driver_name || text(row.payload?.q87_driverName) || text(row.payload?.q86_driverName) || '—';}
 
 function issueList(row){
