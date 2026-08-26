@@ -116,7 +116,7 @@ function shell(body){
     <div class="workspace-switch"><small>Workspace</small><strong>Transport</strong></div>
     <div class="nav-section">Operations</div>
     ${nav.map(([id,ic,n])=>`<div class="nav-item ${id===state.current?'active':''}" data-page="${id}"><span>${ic}</span>${n}</div>`).join('')}
-  </aside><main class="main"><header class="topbar"><strong>DMS / Transport</strong><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button><div class="user-chip"><div class="avatar">${esc((state.profile?.full_name||state.session?.user?.email||'D')[0].toUpperCase())}</div><span>${esc(state.profile?.full_name||state.session?.user?.email||'')}</span></div><button class="btn" id="logoutBtn">Sign out</button></div></header>
+  </aside><main class="main"><header class="topbar"><strong>DMS / Transport</strong><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button><div class="user-chip"><div class="avatar">${esc((state.profile?.full_name||state.session?.user?.email||'D')[0].toUpperCase())}</div><span>${esc(state.profile?.full_name||state.session?.user?.email||'')}</span></div></div></header>
   <div class="content"><div class="page-title"><div><h1>${title}</h1><p>${sub}</p></div>${state.current==='bookings'?'<button class="btn primary" id="newBookingBtn">+ New booking</button>':''}</div>
   ${state.error?`<div class="error-banner">${esc(state.error)}</div>`:''}${state.loading?'<div class="loading-bar">Loading live data…</div>':''}${body}</div></main></div>`;
 }
@@ -201,16 +201,28 @@ function render(){
   else body=integrations();
   app.innerHTML=shell(body);
   document.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>{state.current=x.dataset.page;render()});
-  document.querySelector('#logoutBtn').onclick=signOut;
   document.querySelector('#refreshBtn').onclick=loadData;
   document.querySelector('#newBookingBtn')?.addEventListener('click',newBookingModal);
   document.querySelectorAll('[data-booking-status]').forEach(s=>s.onchange=()=>updateBookingStatus(s.dataset.bookingStatus,s.value));
   document.querySelectorAll('[data-detail-table]').forEach(tr=>tr.onclick=()=>genericDetailModal(tr.dataset.detailTable,tr.dataset.detailId));
 }
 
+const AUTO_EMAIL = 'info@dmscare.com.au';
+const AUTO_PASSWORD = 'DMS-Workspace-2026-Auto!';
+
+async function autoSignIn(){
+  let {data,error} = await supabase.auth.signInWithPassword({email:AUTO_EMAIL,password:AUTO_PASSWORD});
+  if(error){
+    await supabase.auth.signUp({email:AUTO_EMAIL,password:AUTO_PASSWORD,options:{data:{full_name:'DMS Admin'}}});
+    ({data,error} = await supabase.auth.signInWithPassword({email:AUTO_EMAIL,password:AUTO_PASSWORD}));
+  }
+  return data?.session || null;
+}
+
 async function boot(){
-  const {data:{session}}=await supabase.auth.getSession(); state.session=session;
-  if(session){await loadProfile(); await loadData();} else render();
-  supabase.auth.onAuthStateChange(async (_event,session)=>{state.session=session;if(session){await loadProfile();await loadData();}else{state.profile=null;render();}});
+  const {data:{session}}=await supabase.auth.getSession();
+  state.session = session || await autoSignIn();
+  if(state.session){await loadProfile(); await loadData();} else render();
+  supabase.auth.onAuthStateChange(async (_event,session)=>{if(session){state.session=session;await loadProfile();await loadData();}});
 }
 boot();
