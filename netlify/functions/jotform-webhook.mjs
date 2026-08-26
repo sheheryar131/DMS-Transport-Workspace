@@ -320,13 +320,19 @@ export default async (req) => {
   if (expected && url.searchParams.get('key') !== expected) return new Response('Unauthorized', { status: 401 });
 
   let rawRequest = null;
+  let outerFormId = '';
+  let outerSubmissionId = '';
   const contentType = req.headers.get('content-type') || '';
   try {
     if (contentType.includes('application/json')) {
       const body = await req.json();
       rawRequest = body.rawRequest ? JSON.parse(body.rawRequest) : body;
+      outerFormId = body.formID || body.form_id || '';
+      outerSubmissionId = body.submissionID || body.submission_id || '';
     } else if (contentType.includes('multipart/form-data')) {
       const form = await req.formData();
+      outerFormId = form.get('formID') || form.get('form_id') || '';
+      outerSubmissionId = form.get('submissionID') || form.get('submission_id') || '';
       const rawField = form.get('rawRequest');
       if (rawField) {
         rawRequest = JSON.parse(rawField);
@@ -337,6 +343,8 @@ export default async (req) => {
     } else {
       const bodyText = await req.text();
       const params = new URLSearchParams(bodyText);
+      outerFormId = params.get('formID') || params.get('form_id') || '';
+      outerSubmissionId = params.get('submissionID') || params.get('submission_id') || '';
       const rawField = params.get('rawRequest');
       rawRequest = rawField ? JSON.parse(rawField) : Object.fromEntries(params.entries());
     }
@@ -344,8 +352,8 @@ export default async (req) => {
     return Response.json({ ok: false, error: `Invalid payload: ${e}` }, { status: 400 });
   }
 
-  const formId = String(rawRequest?.formID || rawRequest?.form_id || rawRequest?.formId || '');
-  const submissionId = String(rawRequest?.submissionID || rawRequest?.submission_id || rawRequest?.submissionId || crypto.randomUUID());
+  const formId = String(outerFormId || rawRequest?.formID || rawRequest?.form_id || rawRequest?.formId || '');
+  const submissionId = String(outerSubmissionId || rawRequest?.submissionID || rawRequest?.submission_id || rawRequest?.submissionId || crypto.randomUUID());
 
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     console.log('Jotform webhook received (dry-run, no Supabase configured)', { formId, submissionId });
