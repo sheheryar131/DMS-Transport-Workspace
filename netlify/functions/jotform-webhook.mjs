@@ -308,6 +308,18 @@ export default async (req) => {
     if (url.searchParams.get('debug') !== process.env.JOTFORM_WEBHOOK_SECRET) return new Response('Unauthorized', { status: 401 });
     const base = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const headers = { apikey: key, authorization: `Bearer ${key}` };
+    const replaySubmissionId = url.searchParams.get('replay');
+    if (replaySubmissionId) {
+      const rows = await fetch(`${base}/rest/v1/jotform_submissions?submission_id=eq.${encodeURIComponent(replaySubmissionId)}&select=form_id,submission_id,payload`, { headers }).then(r => r.json());
+      const rec = rows[0];
+      if (!rec) return Response.json({ ok: false, error: 'submission not found' });
+      try {
+        await route(rec.form_id, rec.submission_id, rec.payload);
+        return Response.json({ ok: true, replayed: rec.submission_id });
+      } catch (e) {
+        return Response.json({ ok: false, error: String(e), stack: e?.stack });
+      }
+    }
     const [subs, checks, bookingsRows] = await Promise.all([
       fetch(`${base}/rest/v1/jotform_submissions?select=form_id,submission_id,payload,received_at&order=received_at.desc&limit=3`, { headers }).then(r => r.json()),
       fetch(`${base}/rest/v1/vehicle_checks?select=driver_name,check_type,check_date,created_at&order=created_at.desc&limit=5`, { headers }).then(r => r.json()),
