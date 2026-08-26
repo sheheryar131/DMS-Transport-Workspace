@@ -309,7 +309,7 @@ export default async (req) => {
     const base = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const headers = { apikey: key, authorization: `Bearer ${key}` };
     const [subs, checks] = await Promise.all([
-      fetch(`${base}/rest/v1/jotform_submissions?select=form_id,submission_id,received_at&order=received_at.desc&limit=5`, { headers }).then(r => r.json()),
+      fetch(`${base}/rest/v1/jotform_submissions?select=form_id,submission_id,payload,received_at&order=received_at.desc&limit=3`, { headers }).then(r => r.json()),
       fetch(`${base}/rest/v1/vehicle_checks?select=driver_name,check_type,check_date,created_at&order=created_at.desc&limit=5`, { headers }).then(r => r.json()),
     ]);
     return Response.json({ hasSupabaseUrl: !!base, hasServiceKey: !!key, recent_jotform_submissions: subs, recent_vehicle_checks: checks });
@@ -325,14 +325,23 @@ export default async (req) => {
     if (contentType.includes('application/json')) {
       const body = await req.json();
       rawRequest = body.rawRequest ? JSON.parse(body.rawRequest) : body;
+    } else if (contentType.includes('multipart/form-data')) {
+      const form = await req.formData();
+      const rawField = form.get('rawRequest');
+      if (rawField) {
+        rawRequest = JSON.parse(rawField);
+      } else {
+        rawRequest = {};
+        for (const [k, v] of form.entries()) rawRequest[k] = typeof v === 'string' ? v : v.name || null;
+      }
     } else {
       const bodyText = await req.text();
       const params = new URLSearchParams(bodyText);
       const rawField = params.get('rawRequest');
       rawRequest = rawField ? JSON.parse(rawField) : Object.fromEntries(params.entries());
     }
-  } catch {
-    return Response.json({ ok: false, error: 'Invalid payload' }, { status: 400 });
+  } catch (e) {
+    return Response.json({ ok: false, error: `Invalid payload: ${e}` }, { status: 400 });
   }
 
   const formId = String(rawRequest?.formID || rawRequest?.form_id || rawRequest?.formId || '');
