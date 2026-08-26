@@ -308,11 +308,12 @@ export default async (req) => {
     if (url.searchParams.get('debug') !== process.env.JOTFORM_WEBHOOK_SECRET) return new Response('Unauthorized', { status: 401 });
     const base = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const headers = { apikey: key, authorization: `Bearer ${key}` };
-    const [subs, checks] = await Promise.all([
+    const [subs, checks, bookingsRows] = await Promise.all([
       fetch(`${base}/rest/v1/jotform_submissions?select=form_id,submission_id,payload,received_at&order=received_at.desc&limit=3`, { headers }).then(r => r.json()),
       fetch(`${base}/rest/v1/vehicle_checks?select=driver_name,check_type,check_date,created_at&order=created_at.desc&limit=5`, { headers }).then(r => r.json()),
+      fetch(`${base}/rest/v1/bookings?select=booking_code,passenger_name,status,source_form_id,created_at&order=created_at.desc&limit=5`, { headers }).then(r => r.json()),
     ]);
-    return Response.json({ hasSupabaseUrl: !!base, hasServiceKey: !!key, recent_jotform_submissions: subs, recent_vehicle_checks: checks });
+    return Response.json({ hasSupabaseUrl: !!base, hasServiceKey: !!key, recent_jotform_submissions: subs, recent_vehicle_checks: checks, recent_bookings: bookingsRows });
   }
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
   const url = new URL(req.url);
