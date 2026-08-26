@@ -21,7 +21,7 @@ const pages = {
 const nav=[['dashboard','⌂','Dashboard'],['bookings','▦','Master Bookings'],['checks','✓','Daily Vehicle Checks'],['transfers','⇄','Transfer Forms'],['fleet','▣','Fleet'],['stock','□','Stock'],['staff','♙','Staff'],['astp','◎','ASTP Compliance'],['incidents','!','Incidents'],['sil','⌘','SIL & Care'],['integrations','⚙','Integrations']];
 
 const state = {
-  current:'dashboard', session:null, profile:null, loading:false, error:'',
+  current:'dashboard', loading:false, error:'',
   bookings:[], staff:[], vehicles:[], checks:[], transfers:[], incidents:[], stock:[], astp:[],
   orientation:[], silMaintenance:[], firstAid:[], silVisitors:[]
 };
@@ -33,61 +33,7 @@ const badge = s => `<span class="badge ${String(s).toLowerCase().replaceAll(' ',
 const personName = id => state.staff.find(x=>x.id===id)?.name || 'Unassigned';
 const vehicleRego = id => state.vehicles.find(x=>x.id===id)?.rego || '—';
 
-function authScreen(message=''){
-  app.innerHTML = `<div class="auth-shell"><div class="auth-card">
-    <div class="auth-brand"><div class="brand-mark">D</div><div><strong>DMS Transport Workspace</strong><small>Secure internal access</small></div></div>
-    <h1>Sign in</h1><p>Use your DMS workspace account to continue.</p>
-    ${message?`<div class="auth-message">${esc(message)}</div>`:''}
-    <form id="loginForm" class="auth-form">
-      <label>Email<input name="email" type="email" autocomplete="email" required placeholder="name@dmscare.com.au"></label>
-      <label>Password<input name="password" type="password" autocomplete="current-password" required minlength="6" placeholder="••••••••"></label>
-      <button class="btn primary full" type="submit">Sign in</button>
-    </form>
-    <button class="text-btn" id="showSignup">Create first / new account</button>
-    <div class="auth-foot">Jotform forms and apps remain unchanged. This login is only for the office workspace.</div>
-  </div></div>`;
-  document.querySelector('#loginForm').onsubmit = signIn;
-  document.querySelector('#showSignup').onclick = () => signupScreen();
-}
-
-function signupScreen(message=''){
-  app.innerHTML = `<div class="auth-shell"><div class="auth-card">
-    <div class="auth-brand"><div class="brand-mark">D</div><div><strong>DMS Transport Workspace</strong><small>Secure internal access</small></div></div>
-    <h1>Create account</h1><p>Create an office workspace login.</p>
-    ${message?`<div class="auth-message">${esc(message)}</div>`:''}
-    <form id="signupForm" class="auth-form">
-      <label>Full name<input name="full_name" required placeholder="Full name"></label>
-      <label>Email<input name="email" type="email" autocomplete="email" required placeholder="name@dmscare.com.au"></label>
-      <label>Password<input name="password" type="password" autocomplete="new-password" required minlength="8" placeholder="Minimum 8 characters"></label>
-      <button class="btn primary full" type="submit">Create account</button>
-    </form>
-    <button class="text-btn" id="backLogin">Back to sign in</button>
-  </div></div>`;
-  document.querySelector('#signupForm').onsubmit = signUp;
-  document.querySelector('#backLogin').onclick = () => authScreen();
-}
-
-async function signIn(e){
-  e.preventDefault(); const f = new FormData(e.target);
-  const {error} = await supabase.auth.signInWithPassword({email:f.get('email'),password:f.get('password')});
-  if(error) authScreen(error.message);
-}
-async function signUp(e){
-  e.preventDefault(); const f = new FormData(e.target);
-  const {data,error} = await supabase.auth.signUp({email:f.get('email'),password:f.get('password'),options:{data:{full_name:f.get('full_name')}}});
-  if(error) return signupScreen(error.message);
-  if(!data.session) return authScreen('Account created. Check your email to confirm it, then sign in.');
-}
-async function signOut(){ await supabase.auth.signOut(); }
-
-async function loadProfile(){
-  if(!state.session) return;
-  const {data} = await supabase.from('profiles').select('*').eq('id',state.session.user.id).maybeSingle();
-  state.profile = data;
-}
-
 async function loadData(){
-  if(!state.session) return;
   state.loading=true; state.error=''; render();
   const queries = await Promise.all([
     supabase.from('bookings').select('*').order('booking_date',{ascending:false}).limit(500),
@@ -116,7 +62,7 @@ function shell(body){
     <div class="workspace-switch"><small>Workspace</small><strong>Transport</strong></div>
     <div class="nav-section">Operations</div>
     ${nav.map(([id,ic,n])=>`<div class="nav-item ${id===state.current?'active':''}" data-page="${id}"><span>${ic}</span>${n}</div>`).join('')}
-  </aside><main class="main"><header class="topbar"><strong>DMS / Transport</strong><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button><div class="user-chip"><div class="avatar">${esc((state.profile?.full_name||state.session?.user?.email||'D')[0].toUpperCase())}</div><span>${esc(state.profile?.full_name||state.session?.user?.email||'')}</span></div></div></header>
+  </aside><main class="main"><header class="topbar"><strong>DMS / Transport</strong><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button><div class="user-chip"><div class="avatar">D</div><span>DMS Workspace</span></div></div></header>
   <div class="content"><div class="page-title"><div><h1>${title}</h1><p>${sub}</p></div>${state.current==='bookings'?'<button class="btn primary" id="newBookingBtn">+ New booking</button>':''}</div>
   ${state.error?`<div class="error-banner">${esc(state.error)}</div>`:''}${state.loading?'<div class="loading-bar">Loading live data…</div>':''}${body}</div></main></div>`;
 }
@@ -186,7 +132,6 @@ function silPage(){
 }
 
 function render(){
-  if(!state.session) return authScreen();
   let body='';
   if(state.current==='dashboard') body=dashboard();
   else if(state.current==='bookings') body=`<div class="panel">${bookingRows()}</div>`;
@@ -207,22 +152,4 @@ function render(){
   document.querySelectorAll('[data-detail-table]').forEach(tr=>tr.onclick=()=>genericDetailModal(tr.dataset.detailTable,tr.dataset.detailId));
 }
 
-const AUTO_EMAIL = 'info@dmscare.com.au';
-const AUTO_PASSWORD = 'DMS-Workspace-2026-Auto!';
-
-async function autoSignIn(){
-  let {data,error} = await supabase.auth.signInWithPassword({email:AUTO_EMAIL,password:AUTO_PASSWORD});
-  if(error){
-    await supabase.auth.signUp({email:AUTO_EMAIL,password:AUTO_PASSWORD,options:{data:{full_name:'DMS Admin'}}});
-    ({data,error} = await supabase.auth.signInWithPassword({email:AUTO_EMAIL,password:AUTO_PASSWORD}));
-  }
-  return data?.session || null;
-}
-
-async function boot(){
-  const {data:{session}}=await supabase.auth.getSession();
-  state.session = session || await autoSignIn();
-  if(state.session){await loadProfile(); await loadData();} else render();
-  supabase.auth.onAuthStateChange(async (_event,session)=>{if(session){state.session=session;await loadProfile();await loadData();}});
-}
-boot();
+loadData();
