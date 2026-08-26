@@ -1,8 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const supabase = createClient(
-  'https://iqujgnetlzbpgidomilk.supabase.co',
-  'sb_publishable_4k0wUmBakikPasxjc1i_Sg_gxMudkEL'
+  'https://yioqasfpmqvhmxrlpzyu.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlpb3Fhc2ZwbXF2aG14cmxwenl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3MDgwNjAsImV4cCI6MjEwMzI4NDA2MH0.RjBYJJQjhT-LHZhP5CH9rnx81QH4ZLEYdfLPSwWNyjM'
 );
 
 const LABELS = {

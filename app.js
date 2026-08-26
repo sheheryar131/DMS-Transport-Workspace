@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const SUPABASE_URL = 'https://iqujgnetlzbpgidomilk.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_4k0wUmBakikPasxjc1i_Sg_gxMudkEL';
+const SUPABASE_URL = 'https://yioqasfpmqvhmxrlpzyu.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlpb3Fhc2ZwbXF2aG14cmxwenl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3MDgwNjAsImV4cCI6MjEwMzI4NDA2MH0.RjBYJJQjhT-LHZhP5CH9rnx81QH4ZLEYdfLPSwWNyjM';
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 const app = document.querySelector('#app');
