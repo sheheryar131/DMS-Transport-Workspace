@@ -14,6 +14,10 @@ const FORM_IDS = {
   BOOKING_NDIS_HCP: '253346438293867',
   TRANSPORT_SERVICE_LOG: '252861403243047',
   INCIDENT: '252867927039067',
+  ORIENTATION: '253298991210866',
+  SIL_MAINTENANCE: '260138289199873',
+  FIRST_AID: '253227624992060',
+  SIL_VISITOR: '260138249053858',
 };
 
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -188,6 +192,63 @@ function mapIncident(payload, formId, submissionId) {
   };
 }
 
+function mapOrientation(payload, formId, submissionId) {
+  return {
+    source_form_id: formId,
+    source_submission_id: submissionId,
+    participant_name: field(payload, 'Participant Name'),
+    sil_location: field(payload, 'SIL Location'),
+    support_worker_name: field(payload, 'Support Worker Name'),
+    trainer_name: field(payload, 'Trainer / Inductor Name'),
+    check_date: field(payload, 'Date', dateVal),
+    notes: field(payload, 'Additional Notes'),
+    payload,
+  };
+}
+
+function mapSilMaintenance(payload, formId, submissionId) {
+  return {
+    source_form_id: formId,
+    source_submission_id: submissionId,
+    sil_location: field(payload, 'SIL / Office Location'),
+    support_worker_name: field(payload, 'Support Worker Name'),
+    check_date: field(payload, 'Date', dateVal),
+    outside_notes: field(payload, 'Any additional notes: (Outside)') || field(payload, 'Any additional notes:'),
+    inside_notes: field(payload, 'Any additional notes: (Inside)'),
+    residents_notes: field(payload, 'Any additional notes: (Residents)'),
+    payload,
+  };
+}
+
+function mapFirstAid(payload, formId, submissionId) {
+  return {
+    source_form_id: formId,
+    source_submission_id: submissionId,
+    full_name: field(payload, 'Full Name'),
+    sil_location: field(payload, 'SIL Location'),
+    items_used: field(payload, 'First Aid Stock List - Select Items Used'),
+    payload,
+  };
+}
+
+function mapSilVisitor(payload, formId, submissionId) {
+  return {
+    source_form_id: formId,
+    source_submission_id: submissionId,
+    visitor_name: field(payload, 'Visitor Full Name'),
+    sil_location: field(payload, 'SIL Location'),
+    reason_for_visit: field(payload, 'Reason for Visit'),
+    duration: field(payload, 'Estimated Duration of Visit'),
+    visit_at: (() => {
+      const d = raw(payload, 'Date');
+      const dt = dateVal(d); const tm = timeVal(d);
+      return dt ? new Date(`${dt}T${tm || '00:00'}:00`).toISOString() : null;
+    })(),
+    support_worker_name: field(payload, 'Name of On-Duty Support Worker'),
+    payload,
+  };
+}
+
 // ---- supabase helpers ----
 
 async function sbUpsert(table, conflictCol, rows) {
@@ -229,6 +290,14 @@ async function route(formId, submissionId, payload) {
     if (row.booking_code) await sbUpdate('bookings', 'booking_code', row.booking_code, { status: 'Completed' });
   } else if (formId === FORM_IDS.INCIDENT) {
     await sbUpsert('incidents', 'source_submission_id', [mapIncident(payload, formId, submissionId)]);
+  } else if (formId === FORM_IDS.ORIENTATION) {
+    await sbUpsert('orientation_checklists', 'source_submission_id', [mapOrientation(payload, formId, submissionId)]);
+  } else if (formId === FORM_IDS.SIL_MAINTENANCE) {
+    await sbUpsert('sil_maintenance_checks', 'source_submission_id', [mapSilMaintenance(payload, formId, submissionId)]);
+  } else if (formId === FORM_IDS.FIRST_AID) {
+    await sbUpsert('first_aid_checks', 'source_submission_id', [mapFirstAid(payload, formId, submissionId)]);
+  } else if (formId === FORM_IDS.SIL_VISITOR) {
+    await sbUpsert('sil_visitor_checkins', 'source_submission_id', [mapSilVisitor(payload, formId, submissionId)]);
   }
   // Unrecognized forms: kept in jotform_submissions only (raw), no routing.
 }

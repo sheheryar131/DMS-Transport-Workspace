@@ -15,13 +15,15 @@ const pages = {
   staff:['Staff','Staff directory'],
   astp:['ASTP Staff List','Driver compliance and documents'],
   incidents:['Incident & Hazard Reporting','Open → In Review → Closed'],
-  integrations:['Integrations','Jotform, Supabase and automation status']
+  integrations:['Integrations','Jotform, Supabase and automation status'],
+  sil:['SIL & Care Compliance','Orientation, maintenance, first aid and visitor logs']
 };
-const nav=[['dashboard','⌂','Dashboard'],['bookings','▦','Master Bookings'],['checks','✓','Daily Vehicle Checks'],['transfers','⇄','Transfer Forms'],['fleet','▣','Fleet'],['stock','□','Stock'],['staff','♙','Staff'],['astp','◎','ASTP Compliance'],['incidents','!','Incidents'],['integrations','⚙','Integrations']];
+const nav=[['dashboard','⌂','Dashboard'],['bookings','▦','Master Bookings'],['checks','✓','Daily Vehicle Checks'],['transfers','⇄','Transfer Forms'],['fleet','▣','Fleet'],['stock','□','Stock'],['staff','♙','Staff'],['astp','◎','ASTP Compliance'],['incidents','!','Incidents'],['sil','⌘','SIL & Care'],['integrations','⚙','Integrations']];
 
 const state = {
   current:'dashboard', session:null, profile:null, loading:false, error:'',
-  bookings:[], staff:[], vehicles:[], checks:[], transfers:[], incidents:[], stock:[], astp:[]
+  bookings:[], staff:[], vehicles:[], checks:[], transfers:[], incidents:[], stock:[], astp:[],
+  orientation:[], silMaintenance:[], firstAid:[], silVisitors:[]
 };
 
 const esc = (value='') => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -95,11 +97,15 @@ async function loadData(){
     supabase.from('transfer_logs').select('*').order('created_at',{ascending:false}).limit(500),
     supabase.from('incidents').select('*').order('created_at',{ascending:false}).limit(500),
     supabase.from('stock_items').select('*').order('name'),
-    supabase.from('astp_compliance').select('*').order('created_at',{ascending:false})
+    supabase.from('astp_compliance').select('*').order('created_at',{ascending:false}),
+    supabase.from('orientation_checklists').select('*').order('created_at',{ascending:false}).limit(200),
+    supabase.from('sil_maintenance_checks').select('*').order('created_at',{ascending:false}).limit(200),
+    supabase.from('first_aid_checks').select('*').order('created_at',{ascending:false}).limit(200),
+    supabase.from('sil_visitor_checkins').select('*').order('created_at',{ascending:false}).limit(200)
   ]);
   const err = queries.find(q=>q.error)?.error;
   if(err) state.error=err.message;
-  [state.bookings,state.staff,state.vehicles,state.checks,state.transfers,state.incidents,state.stock,state.astp] = queries.map(q=>q.data||[]);
+  [state.bookings,state.staff,state.vehicles,state.checks,state.transfers,state.incidents,state.stock,state.astp,state.orientation,state.silMaintenance,state.firstAid,state.silVisitors] = queries.map(q=>q.data||[]);
   state.loading=false; render();
 }
 
@@ -144,11 +150,13 @@ function stockPage(){return `<div class="panel">${simpleTable(['Stock item','Man
 function incidentPage(){return `<div class="panel">${simpleTable(['Status','Date / Time','Type / Description','Location','Participant','Staff'],state.incidents.map(x=>`<tr class="clickable-check" data-detail-table="incidents" data-detail-id="${x.id}"><td>${badge(x.status)}</td><td>${x.incident_at?new Date(x.incident_at).toLocaleString('en-AU'):'—'}</td><td>${esc(x.description||'—')}</td><td>${esc(x.location||'—')}</td><td>${esc(x.participant_name||'—')}</td><td>${esc(x.staff_name||'—')}</td></tr>`))}</div>`}
 
 function genericDetailModal(table,id){
-  const row=(table==='transfers'?state.transfers:state.incidents).find(x=>x.id===id); if(!row)return;
+  const source={transfers:state.transfers,incidents:state.incidents,orientation:state.orientation,silMaintenance:state.silMaintenance,firstAid:state.firstAid,silVisitors:state.silVisitors}[table]||[];
+  const row=source.find(x=>x.id===id); if(!row)return;
+  const titles={transfers:'Transport Service Log',incidents:'Incident Report',orientation:'Worker Orientation Checklist',silMaintenance:'SIL / Office Maintenance Checklist',firstAid:'First Aid Checklist',silVisitors:'SIL Visitor Check In'};
   const p=row.payload||{};
   const rows=Object.keys(p).filter(k=>!['path','slug','event_id','buildDate','submitDate','submitSource','timeToSubmit','uploadServerUrl','newCardFormMobile','jsExecutionTracker','validatedNewRequiredFieldIDs'].includes(k))
     .map(k=>`<div class="answer-row"><div class="answer-label">${esc(k.replace(/^q\d+_?/,'').replace(/([A-Z])/g,' $1').trim()||k)}</div><div class="answer-value">${esc(typeof p[k]==='object'?JSON.stringify(p[k]):String(p[k]??'—'))}</div></div>`).join('')||'<div class="empty">No detailed submission payload stored for this record.</div>';
-  document.body.insertAdjacentHTML('beforeend',`<div class="compliance-modal-backdrop" id="genericDetailModal"><div class="compliance-modal"><div class="compliance-head"><div><h3>${table==='transfers'?'Transport Service Log':'Incident Report'}</h3></div><button id="closeGenericDetail">×</button></div><div class="compliance-body"><div class="answers-title">Complete submission</div>${rows}</div></div></div>`);
+  document.body.insertAdjacentHTML('beforeend',`<div class="compliance-modal-backdrop" id="genericDetailModal"><div class="compliance-modal"><div class="compliance-head"><div><h3>${titles[table]||'Submission'}</h3></div><button id="closeGenericDetail">×</button></div><div class="compliance-body"><div class="answers-title">Complete submission</div>${rows}</div></div></div>`);
   const close=()=>document.querySelector('#genericDetailModal')?.remove();
   document.querySelector('#closeGenericDetail').onclick=close;
   document.querySelector('#genericDetailModal').onclick=e=>{if(e.target.id==='genericDetailModal')close();};
@@ -167,6 +175,16 @@ async function updateBookingStatus(id,status){
   const row=state.bookings.find(x=>x.id===id); if(row) row.status=status;
 }
 
+function silPage(){
+  const tabs=[
+    ['Orientation',state.orientation.map(x=>`<tr class="clickable-check" data-detail-table="orientation" data-detail-id="${x.id}"><td>${esc(x.participant_name||'—')}</td><td>${esc(x.sil_location||'—')}</td><td>${esc(x.support_worker_name||'—')}</td><td>${esc(x.trainer_name||'—')}</td><td>${fmtDate(x.check_date)}</td></tr>`),['Participant','SIL Location','Support Worker','Trainer','Date']],
+    ['Maintenance',state.silMaintenance.map(x=>`<tr class="clickable-check" data-detail-table="silMaintenance" data-detail-id="${x.id}"><td>${esc(x.sil_location||'—')}</td><td>${esc(x.support_worker_name||'—')}</td><td>${fmtDate(x.check_date)}</td><td>${esc(x.outside_notes||'—')}</td><td>${esc(x.inside_notes||'—')}</td></tr>`),['SIL Location','Support Worker','Date','Outside Notes','Inside Notes']],
+    ['First Aid',state.firstAid.map(x=>`<tr class="clickable-check" data-detail-table="firstAid" data-detail-id="${x.id}"><td>${esc(x.full_name||'—')}</td><td>${esc(x.sil_location||'—')}</td><td>${esc(x.items_used||'—')}</td></tr>`),['Staff','SIL Location','Items Used']],
+    ['Visitors',state.silVisitors.map(x=>`<tr class="clickable-check" data-detail-table="silVisitors" data-detail-id="${x.id}"><td>${esc(x.visitor_name||'—')}</td><td>${esc(x.sil_location||'—')}</td><td>${esc(x.reason_for_visit||'—')}</td><td>${esc(x.duration||'—')}</td><td>${x.visit_at?new Date(x.visit_at).toLocaleString('en-AU'):'—'}</td></tr>`),['Visitor','SIL Location','Reason','Duration','Date/Time']],
+  ];
+  return `<div class="grid-2">${tabs.map(([title,rows,headers])=>`<div class="panel"><div class="panel-head"><h3>${title}</h3></div>${simpleTable(headers,rows)}</div>`).join('')}</div>`;
+}
+
 function render(){
   if(!state.session) return authScreen();
   let body='';
@@ -179,6 +197,7 @@ function render(){
   else if(state.current==='staff') body=staffPage();
   else if(state.current==='astp') body=astpPage();
   else if(state.current==='incidents') body=incidentPage();
+  else if(state.current==='sil') body=silPage();
   else body=integrations();
   app.innerHTML=shell(body);
   document.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>{state.current=x.dataset.page;render()});
