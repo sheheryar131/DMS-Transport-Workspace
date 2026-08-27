@@ -80,9 +80,9 @@ function dateVal(v) {
 
 function timeVal(v) {
   if (v == null) return null;
-  if (typeof v === 'object' && (v.hour != null || v.minute != null)) {
+  if (typeof v === 'object' && (v.hour != null || v.minute != null || v.min != null)) {
     let h = Number(v.hour || 0);
-    const min = String(v.minute || 0).padStart(2, '0');
+    const min = String((v.minute != null ? v.minute : v.min) || 0).padStart(2, '0');
     if (/pm/i.test(v.ampm || '') && h < 12) h += 12;
     if (/am/i.test(v.ampm || '') && h === 12) h = 0;
     return `${String(h).padStart(2, '0')}:${min}`;
@@ -195,7 +195,7 @@ function mapIncident(payload, formId, submissionId) {
       if (!dt) return null;
       return new Date(`${dt}T${tm || '00:00'}:00`).toISOString();
     })(),
-    location: field(payload, 'Location of Incident'),
+    location: field(payload, 'Location of Incident') || text(findExactSuffix(payload, 'address')),
     description: descParts.join(' — ') || null,
     actions_taken: field(payload, 'Actions Taken'),
     participant_name: field(payload, "Participant's Name (if required)"),
