@@ -209,7 +209,7 @@ function mapOrientation(payload, formId, submissionId) {
     source_form_id: formId,
     source_submission_id: submissionId,
     participant_name: field(payload, 'Participant Name'),
-    sil_location: field(payload, 'SIL Location'),
+    sil_location: field(payload, 'SIL Location') || text(findExactSuffix(payload, 'typeA63')),
     support_worker_name: field(payload, 'Support Worker Name'),
     trainer_name: field(payload, 'Trainer / Inductor Name'),
     check_date: field(payload, 'Date', dateVal),
