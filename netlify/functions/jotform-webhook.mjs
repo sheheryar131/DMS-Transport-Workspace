@@ -107,13 +107,18 @@ function shortCode(prefix, submissionId) {
 
 // ---- per-form mapping ----
 
+function findExactSuffix(payload, suffix) {
+  const k = Object.keys(payload).find((x) => x.replace(/^q\d+_/, '') === suffix);
+  return k ? payload[k] : undefined;
+}
+
 function mapVehicleCheck(payload, checkType) {
   return {
     check_type: checkType,
     check_date: field(payload, 'Date', dateVal),
     driver_name: field(payload, 'Driver Name'),
-    rego: field(payload, 'Select Vehicle Registration'),
-    odometer: field(payload, checkType === 'pre_start' ? 'Odometer - Start' : 'Odometer - End', num),
+    rego: field(payload, 'Select Vehicle Registration') || text(findExactSuffix(payload, 'typeA')),
+    odometer: field(payload, checkType === 'pre_start' ? 'Odometer - Start' : 'Odometer - End', num) ?? num(findExactSuffix(payload, 'number')),
     comments: field(payload, 'Any additional comments'),
     payload,
   };
