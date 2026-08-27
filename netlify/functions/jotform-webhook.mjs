@@ -124,6 +124,13 @@ function mapVehicleCheck(payload, checkType) {
   };
 }
 
+function dateValSlash(t) {
+  if (!t) return null;
+  const m = String(t).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+}
+
 function mapBooking(payload, formId, submissionId) {
   const isNdis = formId === FORM_IDS.BOOKING_NDIS_HCP;
   const code = field(payload, 'Quote Number') || shortCode('DMS', submissionId);
@@ -137,13 +144,13 @@ function mapBooking(payload, formId, submissionId) {
     source_form_id: formId,
     source_submission_id: submissionId,
     submission_date: new Date().toISOString(),
-    booking_date: field(payload, 'Date of Booking', dateVal) || field(payload, 'Date and Time of Booking', dateVal),
+    booking_date: field(payload, 'Date of Booking', dateVal) || field(payload, 'Date and Time of Booking', dateVal) || field(payload, 'Booking Date', dateVal),
     requested_time: field(payload, 'Collection Time', timeVal),
     passenger_name: field(payload, "Passenger's Name") || field(payload, 'Passenger Name'),
-    passenger_email: field(payload, 'Email Address'),
+    passenger_email: field(payload, 'Email Address') || text(findExactSuffix(payload, 'email308')),
     passenger_phone: field(payload, 'Contact Number'),
     pickup_location: field(payload, 'Pickup Address'),
-    dropoff_location: field(payload, 'Drop-off Address'),
+    dropoff_location: field(payload, 'Drop-off Address') || text(findExactSuffix(payload, 'address273')),
     return_required: field(payload, 'Return Required?', bool),
     wait_time_minutes: field(payload, 'Wait Time', num),
     funding_type: isNdis ? (field(payload, 'Funding Type') || 'NDIS/HCP') : field(payload, 'Transport Type'),
@@ -158,15 +165,15 @@ function mapTransferLog(payload, formId, submissionId) {
   return {
     source_form_id: formId,
     source_submission_id: submissionId,
-    booking_code: field(payload, 'Booking ID'),
+    booking_code: field(payload, 'Booking ID') || text(findExactSuffix(payload, 'typeA25')),
     driver_name: field(payload, 'Driver Name'),
     vehicle_used: field(payload, 'Vehicle Used'),
-    passenger_name: field(payload, "Passenger's Name"),
+    passenger_name: field(payload, "Passenger's Name") || text(findExactSuffix(payload, 'typeA')),
     pickup_location: field(payload, 'Pickup Location'),
     dropoff_location: field(payload, 'Drop-off Location'),
-    collection_date: field(payload, 'Date of Collection', dateVal),
+    collection_date: field(payload, 'Date of Collection', dateVal) || dateValSlash(text(findExactSuffix(payload, 'typeA48'))),
     collection_time: field(payload, 'Time of Collection', timeVal),
-    return_booked: field(payload, 'Return Booked (if required)'),
+    return_booked: field(payload, 'Return Booked (if required)') || field(payload, 'Return Required'),
     wait_time: field(payload, 'Wait Time'),
     notes: field(payload, 'Any additional notes or changes?'),
     payload,
