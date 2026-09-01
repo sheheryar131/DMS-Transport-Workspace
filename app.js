@@ -23,7 +23,7 @@ const nav=[['dashboard','⌂','Dashboard'],['bookings','▦','Master Bookings'],
 const state = {
   current:'dashboard', loading:false, error:'',
   bookings:[], staff:[], vehicles:[], checks:[], transfers:[], incidents:[], stock:[], astp:[],
-  orientation:[], silMaintenance:[], firstAid:[], silVisitors:[]
+  orientation:[], silMaintenance:[], firstAid:[], silVisitors:[], notificationSettings:null
 };
 
 const esc = (value='') => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -52,6 +52,8 @@ async function loadData(){
   const err = queries.find(q=>q.error)?.error;
   if(err) state.error=err.message;
   [state.bookings,state.staff,state.vehicles,state.checks,state.transfers,state.incidents,state.stock,state.astp,state.orientation,state.silMaintenance,state.firstAid,state.silVisitors] = queries.map(q=>q.data||[]);
+  const {data:ns} = await supabase.from('notification_settings').select('*').eq('entity_type','vehicle_expiry').maybeSingle();
+  state.notificationSettings = ns;
   state.loading=false; render();
 }
 
@@ -197,7 +199,19 @@ function genericDetailModal(table,id){
   document.querySelector('#closeGenericDetail').onclick=close;
   document.querySelector('#genericDetailModal').onclick=e=>{if(e.target.id==='genericDetailModal')close();};
 }
-function integrations(){return `<div class="grid-2"><div class="panel"><div class="panel-head"><h3>Connections</h3></div><div class="panel-body"><div class="connection"><strong>Supabase / PostgreSQL</strong><span class="ok">Connected</span></div><div class="connection"><strong>Supabase Auth</strong><span class="ok">Connected</span></div><div class="connection"><strong>GitHub</strong><span class="ok">Source controlled</span></div><div class="connection"><strong>Netlify</strong><span class="ok">Git deploy</span></div><div class="connection"><strong>Jotform</strong><span class="warn">Existing forms untouched</span></div></div></div><div class="panel"><div class="panel-head"><h3>Planned data flow</h3></div><div class="panel-body"><strong>Jotform App → existing Jotform → secure webhook → Supabase → Workspace</strong><p class="note">Jotform ingestion remains disabled until the database import and a controlled test submission are verified.</p></div></div></div>`}
+function integrations(){
+  const ns = state.notificationSettings || {threshold_days:[30,14],recipient_email:'transport@dmscare.com.au',enabled:true};
+  return `<div class="grid-2"><div class="panel"><div class="panel-head"><h3>Connections</h3></div><div class="panel-body"><div class="connection"><strong>Supabase / PostgreSQL</strong><span class="ok">Connected</span></div><div class="connection"><strong>Supabase Auth</strong><span class="ok">Connected</span></div><div class="connection"><strong>GitHub</strong><span class="ok">Source controlled</span></div><div class="connection"><strong>Netlify</strong><span class="ok">Git deploy</span></div><div class="connection"><strong>Jotform</strong><span class="ok">8 forms wired</span></div><div class="connection"><strong>Email alerts (Resend)</strong><span class="ok">Daily @ scheduled</span></div></div></div>
+  <div class="panel"><div class="panel-head"><h3>Vehicle expiry alerts</h3></div><div class="panel-body">
+    <form id="notifSettingsForm" class="form-grid">
+      <label class="span-2">Send alerts to<input name="recipient_email" value="${esc(ns.recipient_email)}" type="email" required></label>
+      <label class="span-2">Alert this many days before expiry (comma-separated, e.g. 30,14,7)<input name="threshold_days" value="${esc((ns.threshold_days||[]).join(','))}" required></label>
+      <label>Enabled<select name="enabled"><option value="true" ${ns.enabled?'selected':''}>Yes</option><option value="false" ${!ns.enabled?'selected':''}>No</option></select></label>
+      <div class="span-2 modal-actions"><button type="button" class="btn" id="sendTestEmailBtn">Send test check now</button><button class="btn primary" type="submit">Save settings</button></div>
+    </form>
+    <p class="note">Checks Registration and HVIS expiry dates on every vehicle in the Fleet daily, and emails an alert the moment a vehicle crosses one of the day thresholds above. Add or remove thresholds any time — no code changes needed.</p>
+  </div></div></div>`;
+}
 
 function newBookingModal(){
   document.body.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" id="bookingModal"><div class="modal"><div class="modal-head"><h3>New booking</h3><button class="icon-btn" data-close>×</button></div><form id="bookingForm" class="form-grid"><label>Booking ID<input name="booking_code" required placeholder="DMS00136"></label><label>Passenger<input name="passenger_name" required></label><label>Booking date<input name="booking_date" type="date" required></label><label>Time<input name="requested_time" type="time"></label><label class="span-2">Pickup<input name="pickup_location"></label><label class="span-2">Drop-off<input name="dropoff_location"></label><label>Funding<select name="funding_type"><option>NDIS</option><option>HCP</option><option>Private</option><option>Other</option></select></label><label>Driver<select name="driver_id"><option value="">Unassigned</option>${state.staff.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></label><label>Vehicle<select name="vehicle_id"><option value="">Unassigned</option>${state.vehicles.map(v=>`<option value="${v.id}">${esc(v.rego)}</option>`).join('')}</select></label><label>Status<select name="status">${['Pending','Booked','Sent to Driver','Completed','Cancelled'].map(s=>`<option>${s}</option>`).join('')}</select></label><div class="span-2 modal-actions"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary" type="submit">Create booking</button></div></form></div></div>`);
@@ -245,6 +259,27 @@ function render(){
   document.querySelector('#addVehicleBtn')?.addEventListener('click',addVehicleRow);
   document.querySelector('#addFieldBtn')?.addEventListener('click',addVehicleField);
   document.querySelectorAll('[data-veh-delete]').forEach(btn=>btn.onclick=()=>deleteVehicleRow(btn.dataset.vehDelete));
+  document.querySelector('#notifSettingsForm')?.addEventListener('submit',saveNotificationSettings);
+  document.querySelector('#sendTestEmailBtn')?.addEventListener('click',sendTestEmailCheck);
+}
+
+async function saveNotificationSettings(e){
+  e.preventDefault();
+  const f=new FormData(e.target);
+  const threshold_days=f.get('threshold_days').split(',').map(s=>parseInt(s.trim(),10)).filter(n=>Number.isFinite(n)&&n>0);
+  const payload={recipient_email:f.get('recipient_email'),threshold_days,enabled:f.get('enabled')==='true'};
+  const {data,error}=await supabase.from('notification_settings').update(payload).eq('entity_type','vehicle_expiry').select().single();
+  if(error){alert('Could not save: '+error.message);return;}
+  state.notificationSettings=data;
+  alert('Saved.');
+}
+
+async function sendTestEmailCheck(){
+  try{
+    const res=await fetch('/.netlify/functions/expiry-check-scheduled');
+    const json=await res.json();
+    alert(`Check ran: ${json.checked??'?'} vehicles checked, ${json.alertsSent??0} alert(s) sent.`);
+  }catch(e){alert('Could not run check: '+e.message);}
 }
 
 loadData();

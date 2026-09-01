@@ -2,6 +2,9 @@
   publish = "."
   functions = "netlify/functions"
 
+[functions."expiry-check-scheduled"]
+  schedule = "@daily"
+
 [[redirects]]
   from = "/api/jotform"
   to = "/.netlify/functions/jotform-webhook"
