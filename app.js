@@ -276,9 +276,12 @@ async function saveNotificationSettings(e){
 
 async function sendTestEmailCheck(){
   try{
-    const res=await fetch('/.netlify/functions/expiry-check-scheduled');
-    const json=await res.json();
-    alert(`Check ran: ${json.checked??'?'} vehicles checked, ${json.alertsSent??0} alert(s) sent.`);
+    const res=await fetch('/.netlify/functions/expiry-check-test?key=29b545104d54fe607afe6f0b6a5f73cd');
+    const text=await res.text();
+    let json; try{json=JSON.parse(text);}catch{json=null;}
+    if(!json){alert('Unexpected response: '+text.slice(0,300));return;}
+    if(!json.ok){alert('Check failed: '+json.error);return;}
+    alert(`Check ran: ${json.checked} vehicles checked, ${json.matchingAlerts} matched a threshold, ${json.alertsSent} email(s) sent.\n\n${(json.details||[]).join('\n')||'No vehicles are within an alert threshold right now.'}`);
   }catch(e){alert('Could not run check: '+e.message);}
 }
 
