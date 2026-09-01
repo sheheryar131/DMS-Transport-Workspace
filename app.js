@@ -89,7 +89,97 @@ function simpleTable(headers, rows){
 }
 function checksPage(){return `<div class="panel">${simpleTable(['Type','Date','Driver','Vehicle','Odometer','Comments'],state.checks.map(x=>`<tr><td>${badge(x.check_type==='pre_start'?'Pre-start':'Post-shift')}</td><td>${fmtDate(x.check_date)}</td><td>${esc(x.driver_name||personName(x.staff_id))}</td><td>${esc(x.rego||vehicleRego(x.vehicle_id))}</td><td>${esc(x.odometer??'—')}</td><td>${esc(x.comments||'—')}</td></tr>`))}</div>`}
 function transfersPage(){return `<div class="panel">${simpleTable(['Booking','Driver','Vehicle','Passenger','Collection','Pickup','Drop-off'],state.transfers.map(x=>`<tr class="clickable-check" data-detail-table="transfers" data-detail-id="${x.id}"><td><strong>${esc(x.booking_code||'—')}</strong></td><td>${esc(x.driver_name||'—')}</td><td>${esc(x.vehicle_used||'—')}</td><td>${esc(x.passenger_name||'—')}</td><td>${fmtDate(x.collection_date)} ${fmtTime(x.collection_time)}</td><td>${esc(x.pickup_location||'—')}</td><td>${esc(x.dropoff_location||'—')}</td></tr>`))}</div>`}
-function fleetPage(){return `<div class="panel">${simpleTable(['Registration','Make / Model','Status','Rego Expiry','HVIS Expiry','ASTP','Odometer'],state.vehicles.map(x=>`<tr><td><strong>${esc(x.rego)}</strong></td><td>${esc(x.make_model||'—')}</td><td>${badge(x.status||'—')}</td><td>${fmtDate(x.rego_expiry)}</td><td>${fmtDate(x.hvis_expiry)}</td><td>${esc(x.astp_usage||'—')}</td><td>${esc(x.current_odometer??'—')}</td></tr>`))}</div>`}
+const VEHICLE_STATUS_OPTS=['Pending','Completed','Missing','n/a'];
+const VEHICLE_YN_OPTS=['PENDING','YES','NO'];
+const VEHICLE_ASTP_OPTS=['RELIEF','PRIMARY','n/a'];
+const VEHICLE_GROUP_OPTS=['SUV','Wheelchair Accessible Vehicles','LDV VAN','Hatchback','Other'];
+
+function vehExtraKeys(){const keys=new Set();state.vehicles.forEach(v=>Object.keys(v.extra||{}).forEach(k=>keys.add(k)));return [...keys];}
+
+function vSelect(id,field,value,opts){return `<select data-veh-field="${field}" data-veh-id="${id}"><option value=""></option>${opts.map(o=>`<option ${value===o?'selected':''}>${esc(o)}</option>`).join('')}</select>`}
+function vText(id,field,value,type='text'){return `<input data-veh-field="${field}" data-veh-id="${id}" type="${type}" value="${esc(value??'')}">`}
+function vExtra(id,key,value){return `<input data-veh-extra="${key}" data-veh-id="${id}" value="${esc(value??'')}">`}
+
+function fleetPage(){
+  const extraKeys=vehExtraKeys();
+  const groups=[...new Set(state.vehicles.map(v=>v.vehicle_group||'Unassigned'))];
+  const cols=['Rego','Group','Status','Make / Model','Year','VIN','Rego Expiry','HVIS Expiry','ASTP Usage','App. Pack','Emergency Equip.','Epi-Pen','Warning Signage','Odometer','Notes',...extraKeys,''];
+  const rowsHtml = groups.map(g=>{
+    const groupRows = state.vehicles.filter(v=>(v.vehicle_group||'Unassigned')===g).map(v=>`<tr>
+      <td>${vText(v.id,'rego',v.rego)}</td>
+      <td>${vSelect(v.id,'vehicle_group',v.vehicle_group,VEHICLE_GROUP_OPTS)}</td>
+      <td>${vSelect(v.id,'status',v.status,VEHICLE_STATUS_OPTS)}</td>
+      <td>${vText(v.id,'make_model',v.make_model)}</td>
+      <td>${vText(v.id,'year',v.year,'number')}</td>
+      <td>${vText(v.id,'vin',v.vin)}</td>
+      <td>${vText(v.id,'rego_expiry',v.rego_expiry,'date')}</td>
+      <td>${vText(v.id,'hvis_expiry',v.hvis_expiry,'date')}</td>
+      <td>${vSelect(v.id,'astp_usage',v.astp_usage,VEHICLE_ASTP_OPTS)}</td>
+      <td>${v.application_pack_url?`<a href="${esc(v.application_pack_url)}" target="_blank" rel="noopener">File ↗</a>`:vText(v.id,'application_pack_url','')}</td>
+      <td>${vSelect(v.id,'emergency_equipment_label',v.emergency_equipment==null?'':(v.emergency_equipment?'YES':'NO'),VEHICLE_YN_OPTS)}</td>
+      <td>${vSelect(v.id,'epi_pen_label',v.epi_pen==null?'':(v.epi_pen?'YES':'NO'),VEHICLE_YN_OPTS)}</td>
+      <td>${vSelect(v.id,'warning_signage_label',v.warning_signage==null?'':(v.warning_signage?'YES':'NO'),VEHICLE_YN_OPTS)}</td>
+      <td>${vText(v.id,'current_odometer',v.current_odometer,'number')}</td>
+      <td>${vText(v.id,'notes',v.notes)}</td>
+      ${extraKeys.map(k=>`<td>${vExtra(v.id,k,(v.extra||{})[k])}</td>`).join('')}
+      <td><button class="btn small" data-veh-delete="${v.id}">Del</button></td>
+    </tr>`).join('');
+    return `<tr class="group-row"><td colspan="${cols.length}"><strong>${esc(g)}</strong></td></tr>${groupRows}`;
+  }).join('');
+  return `<div class="panel">
+    <div class="panel-head"><h3>Fleet — Asset List</h3><div><button class="btn" id="addFieldBtn">+ Field</button> <button class="btn primary" id="addVehicleBtn">+ Vehicle</button></div></div>
+    <div class="table-wrap"><table class="table"><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table></div>
+  </div>`;
+}
+
+async function updateVehicleField(id,field,value){
+  const patch={};
+  if(field==='emergency_equipment_label'){patch.emergency_equipment = value===''?null:value==='YES';}
+  else if(field==='epi_pen_label'){patch.epi_pen = value===''?null:value==='YES';}
+  else if(field==='warning_signage_label'){patch.warning_signage = value===''?null:value==='YES';}
+  else if(field==='year'||field==='current_odometer'){patch[field]=value===''?null:Number(value);}
+  else {patch[field]=value===''?null:value;}
+  const {error} = await supabase.from('vehicles').update(patch).eq('id',id);
+  if(error){alert('Could not save: '+error.message);return;}
+  const v=state.vehicles.find(x=>x.id===id); if(v) Object.assign(v,patch);
+}
+
+async function updateVehicleExtra(id,key,value){
+  const v=state.vehicles.find(x=>x.id===id); if(!v) return;
+  const extra={...(v.extra||{}),[key]:value};
+  const {error} = await supabase.from('vehicles').update({extra}).eq('id',id);
+  if(error){alert('Could not save: '+error.message);return;}
+  v.extra=extra;
+}
+
+async function addVehicleRow(){
+  const {data,error} = await supabase.from('vehicles').insert({rego:'NEW-'+Date.now().toString().slice(-6),vehicle_group:'Unassigned'}).select().single();
+  if(error){alert('Could not add vehicle: '+error.message);return;}
+  state.vehicles.push(data); render();
+}
+
+async function deleteVehicleRow(id){
+  if(!confirm('Delete this vehicle? This cannot be undone.')) return;
+  const {error} = await supabase.from('vehicles').delete().eq('id',id);
+  if(error){alert('Could not delete: '+error.message);return;}
+  state.vehicles = state.vehicles.filter(v=>v.id!==id); render();
+}
+
+async function addVehicleField(){
+  const name = prompt('New field name (e.g. "Insurance Provider"):');
+  if(!name) return;
+  const key = name.trim();
+  if(!key) return;
+  for(const v of state.vehicles){
+    const extra={...(v.extra||{})};
+    if(!(key in extra)){
+      extra[key]='';
+      const {error} = await supabase.from('vehicles').update({extra}).eq('id',v.id);
+      if(!error) v.extra=extra;
+    }
+  }
+  render();
+}
 function staffPage(){return `<div class="panel">${simpleTable(['Staff member','Email','Phone','Status'],state.staff.map(x=>`<tr><td><strong>${esc(x.name)}</strong></td><td>${esc(x.email||'—')}</td><td>${esc(x.phone||'—')}</td><td>${badge(x.status||'Active')}</td></tr>`))}</div>`}
 function astpPage(){return `<div class="panel">${simpleTable(['Staff member','Driver Application','Medical Fitness','WWCC','Licence','Notes'],state.astp.map(x=>`<tr><td><strong>${esc(personName(x.staff_id))}</strong></td><td>${x.driver_application_url?'✓':'—'}</td><td>${x.medical_fitness_url?'✓':'—'}</td><td>${x.wwc_url?'✓':'—'}</td><td>${x.drivers_licence_url?'✓':'—'}</td><td>${esc(x.notes||'—')}</td></tr>`))}</div>`}
 function stockPage(){return `<div class="panel">${simpleTable(['Stock item','Mandatory Quantity','Expiry','Notes'],state.stock.map(x=>`<tr><td><strong>${esc(x.name)}</strong></td><td>${esc(x.mandatory_quantity||'—')}</td><td>${fmtDate(x.expiry_date)}</td><td>${esc(x.notes||'—')}</td></tr>`))}</div>`}
@@ -150,6 +240,11 @@ function render(){
   document.querySelector('#newBookingBtn')?.addEventListener('click',newBookingModal);
   document.querySelectorAll('[data-booking-status]').forEach(s=>s.onchange=()=>updateBookingStatus(s.dataset.bookingStatus,s.value));
   document.querySelectorAll('[data-detail-table]').forEach(tr=>tr.onclick=()=>genericDetailModal(tr.dataset.detailTable,tr.dataset.detailId));
+  document.querySelectorAll('[data-veh-field]').forEach(el=>el.onchange=()=>updateVehicleField(el.dataset.vehId,el.dataset.vehField,el.value));
+  document.querySelectorAll('[data-veh-extra]').forEach(el=>el.onchange=()=>updateVehicleExtra(el.dataset.vehId,el.dataset.vehExtra,el.value));
+  document.querySelector('#addVehicleBtn')?.addEventListener('click',addVehicleRow);
+  document.querySelector('#addFieldBtn')?.addEventListener('click',addVehicleField);
+  document.querySelectorAll('[data-veh-delete]').forEach(btn=>btn.onclick=()=>deleteVehicleRow(btn.dataset.vehDelete));
 }
 
 loadData();
