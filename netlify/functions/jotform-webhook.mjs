@@ -222,12 +222,12 @@ function mapSilMaintenance(payload, formId, submissionId) {
   return {
     source_form_id: formId,
     source_submission_id: submissionId,
-    sil_location: field(payload, 'SIL / Office Location'),
+    sil_location: field(payload, 'SIL / Office Location') || text(findExactSuffix(payload, 'typeA63')),
     support_worker_name: field(payload, 'Support Worker Name'),
     check_date: field(payload, 'Date', dateVal),
-    outside_notes: field(payload, 'Any additional notes: (Outside)') || field(payload, 'Any additional notes:'),
-    inside_notes: field(payload, 'Any additional notes: (Inside)'),
-    residents_notes: field(payload, 'Any additional notes: (Residents)'),
+    outside_notes: text(findExactSuffix(payload, 'anyAdditional')),
+    inside_notes: text(findExactSuffix(payload, 'anyAdditional125')),
+    residents_notes: text(findExactSuffix(payload, 'anyAdditional128')),
     payload,
   };
 }
@@ -247,8 +247,8 @@ function mapSilVisitor(payload, formId, submissionId) {
   return {
     source_form_id: formId,
     source_submission_id: submissionId,
-    visitor_name: field(payload, 'Visitor Full Name'),
-    sil_location: field(payload, 'SIL Location'),
+    visitor_name: field(payload, 'Visitor Full Name') || text(findExactSuffix(payload, 'typeA')),
+    sil_location: field(payload, 'SIL Location') || text(findExactSuffix(payload, 'typeA63')),
     reason_for_visit: field(payload, 'Reason for Visit'),
     duration: field(payload, 'Estimated Duration of Visit'),
     visit_at: (() => {
