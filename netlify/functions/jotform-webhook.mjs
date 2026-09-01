@@ -236,9 +236,9 @@ function mapFirstAid(payload, formId, submissionId) {
   return {
     source_form_id: formId,
     source_submission_id: submissionId,
-    full_name: field(payload, 'Full Name'),
-    sil_location: field(payload, 'SIL Location'),
-    items_used: field(payload, 'First Aid Stock List - Select Items Used'),
+    full_name: field(payload, 'Full Name') || text(findExactSuffix(payload, 'typeA')),
+    sil_location: field(payload, 'SIL Location') || text(findExactSuffix(payload, 'typeA63')),
+    items_used: field(payload, 'First Aid Stock List - Select Items Used') || text(findExactSuffix(payload, 'stock')),
     payload,
   };
 }
