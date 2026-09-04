@@ -17,7 +17,7 @@
   --ease:cubic-bezier(.2,.7,.3,1);
 }
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%;font-family:'Inter',system-ui,sans-serif;color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
+html,body{margin:0;min-height:100%;font-family:'Inter',system-ui,sans-serif;color:var(--ink);background:var(--paper) fixed;background-image:radial-gradient(circle at 8% 0%, rgba(15,109,102,.07), transparent 32%),radial-gradient(circle at 95% 12%, rgba(201,125,42,.06), transparent 30%),radial-gradient(circle at 50% 100%, rgba(15,109,102,.05), transparent 45%);-webkit-font-smoothing:antialiased}
 h1,h2,h3,.brand,.nav-item,.btn,.metric-value{font-family:'Manrope',Inter,system-ui,sans-serif}
 button,input,select,textarea{font:inherit;color:inherit}
 ::selection{background:var(--teal);color:#fff}
@@ -192,8 +192,22 @@ th.col-removable:hover .col-del-x{opacity:1}
 .muted{color:var(--faint)}
 
 /* ===== Fleet group headers ===== */
-.group-row td{background:linear-gradient(90deg,var(--teal-tint),transparent);border-top:2px solid var(--teal);padding-top:12px}
+.group-row td{background:linear-gradient(90deg,var(--teal-tint),transparent);border-top:2px solid var(--teal);padding-top:14px;padding-bottom:14px;text-align:center}
 .group-row{position:sticky;top:38px}
+.group-title{display:inline-flex;align-items:center;gap:9px;font-size:14.5px;font-weight:800;color:var(--teal-dark);letter-spacing:.04em;text-transform:uppercase}
+.group-ic{width:20px;height:20px;color:var(--teal)}
+.group-ic svg{width:100%;height:100%}
+
+/* ===== File upload cell ===== */
+.file-upload-cell{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.file-upload-input{display:none}
+.file-upload-btn{cursor:pointer}
+
+/* ===== PDF inline preview ===== */
+.pdf-preview-wrap{display:block;width:150px;height:110px;border-radius:8px;border:1px solid var(--line);overflow:hidden;position:relative;box-shadow:var(--shadow-sm);text-decoration:none;transition:transform .15s var(--ease)}
+.pdf-preview-wrap:hover{transform:scale(1.03);box-shadow:var(--shadow)}
+.pdf-preview{width:400%;height:400%;transform:scale(.25);transform-origin:top left;pointer-events:none;border:0}
+.pdf-preview-fallback{display:none}
 
 .system-status-section{margin-top:32px;padding-top:22px;border-top:1px dashed var(--line)}
 .system-status-section .section-label{font-size:11px;letter-spacing:.06em;color:var(--faint);font-weight:700;margin-bottom:10px;text-transform:uppercase}

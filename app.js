@@ -377,10 +377,10 @@ function astpPage(){
     addDefaults:undefined,
     cols:[
       {label:'Staff member', render:(r)=>`<strong>${esc(personName(r.staff_id))}</strong>`},
-      {label:'Driver Application', render:r=>r.driver_application_url?fileLinkChip(r.driver_application_url):'—'},
-      {label:'Medical Fitness', render:r=>r.medical_fitness_url?fileLinkChip(r.medical_fitness_url):'—'},
-      {label:'WWCC', render:r=>r.wwc_url?fileLinkChip(r.wwc_url):'—'},
-      {label:'Licence', render:r=>r.drivers_licence_url?fileLinkChip(r.drivers_licence_url):'—'},
+      {label:'Driver Application', render:(r,e)=>e?eFileUpload('astp_compliance','astp',r.id,'driver_application_url',r.driver_application_url):(r.driver_application_url?fileLinkChip(r.driver_application_url):'—')},
+      {label:'Medical Fitness', render:(r,e)=>e?eFileUpload('astp_compliance','astp',r.id,'medical_fitness_url',r.medical_fitness_url):(r.medical_fitness_url?fileLinkChip(r.medical_fitness_url):'—')},
+      {label:'WWCC', render:(r,e)=>e?eFileUpload('astp_compliance','astp',r.id,'wwc_url',r.wwc_url):(r.wwc_url?fileLinkChip(r.wwc_url):'—')},
+      {label:'Licence', render:(r,e)=>e?eFileUpload('astp_compliance','astp',r.id,'drivers_licence_url',r.drivers_licence_url):(r.drivers_licence_url?fileLinkChip(r.drivers_licence_url):'—')},
       {label:'Notes', render:(r,e)=>e?eText('astp_compliance','astp',r.id,'notes',r.notes):esc(r.notes||'—')},
     ]
   });
@@ -428,6 +428,13 @@ const VEHICLE_STATUS_OPTS=['Pending','Completed','Missing','n/a'];
 const VEHICLE_YN_OPTS=['PENDING','YES','NO'];
 const VEHICLE_ASTP_OPTS=['RELIEF','PRIMARY','n/a'];
 const VEHICLE_GROUP_OPTS=['SUV','Wheelchair Accessible Vehicles','LDV VAN','Hatchback','Other'];
+function groupIcon(name){
+  const n = String(name||'').toLowerCase();
+  if(n.includes('wheelchair')) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="18" r="3"/><path d="M8 18V9a2 2 0 0 1 2-2h1M8 13h6l3 5h3"/><circle cx="17" cy="5" r="1.5"/></svg>';
+  if(n.includes('van')) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 17h2M2 8h13l4 4v5h-2"/><path d="M2 8v9h2"/><rect x="15" y="12" width="6" height="5"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>';
+  if(n.includes('hatch')) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 16l1.5-5.5A2 2 0 0 1 6.4 9h11.2a2 2 0 0 1 1.9 1.5L21 16"/><path d="M3 16h18v3H3z"/><circle cx="7" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>';
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13l2-6a2 2 0 0 1 2-1h10a2 2 0 0 1 2 1l2 6"/><rect x="1" y="13" width="22" height="6" rx="1"/><circle cx="6.5" cy="19.5" r="1.5"/><circle cx="17.5" cy="19.5" r="1.5"/></svg>';
+}
 
 function fleetPage(){
   const editing = !!editState.fleet;
@@ -445,7 +452,7 @@ function fleetPage(){
       <td>${editing?eText('vehicles','vehicles',v.id,'rego_expiry',v.rego_expiry,{type:'date'}):fmtDate(v.rego_expiry)}</td>
       <td>${editing?eText('vehicles','vehicles',v.id,'hvis_expiry',v.hvis_expiry,{type:'date'}):fmtDate(v.hvis_expiry)}</td>
       <td>${editing?eSelect('vehicles','vehicles',v.id,'astp_usage',v.astp_usage,VEHICLE_ASTP_OPTS):esc(v.astp_usage||'—')}</td>
-      <td>${v.application_pack_url?fileLinkChip(v.application_pack_url):(editing?eText('vehicles','vehicles',v.id,'application_pack_url',''):'—')}</td>
+      <td>${editing?eFileUpload('vehicles','vehicles',v.id,'application_pack_url',v.application_pack_url):(v.application_pack_url?fileLinkChip(v.application_pack_url):'—')}</td>
       <td>${editing?eSelect('vehicles','vehicles',v.id,'emergency_equipment_label',v.emergency_equipment==null?'':(v.emergency_equipment?'YES':'NO'),VEHICLE_YN_OPTS,{cast:'bool-yn'}):badge(v.emergency_equipment==null?'—':(v.emergency_equipment?'YES':'NO'))}</td>
       <td>${editing?eSelect('vehicles','vehicles',v.id,'epi_pen_label',v.epi_pen==null?'':(v.epi_pen?'YES':'NO'),VEHICLE_YN_OPTS,{cast:'bool-yn'}):badge(v.epi_pen==null?'—':(v.epi_pen?'YES':'NO'))}</td>
       <td>${editing?eSelect('vehicles','vehicles',v.id,'warning_signage_label',v.warning_signage==null?'':(v.warning_signage?'YES':'NO'),VEHICLE_YN_OPTS,{cast:'bool-yn'}):badge(v.warning_signage==null?'—':(v.warning_signage?'YES':'NO'))}</td>
@@ -454,7 +461,7 @@ function fleetPage(){
       ${extraKeys.map(k=>`<td>${eExtra('vehicles','vehicles',v.id,k,(v.extra||{})[k],{disabled:!editing})}</td>`).join('')}
       ${editing?`<td><button class="btn small danger" data-del-row="vehicles|vehicles|${v.id}">Del</button></td>`:''}
     </tr>`).join('');
-    return `<tr class="group-row"><td colspan="${cols.length+(editing?1:0)}">${esc(g)}</td></tr>${groupRows}`;
+    return `<tr class="group-row"><td colspan="${cols.length+(editing?1:0)}"><span class="group-title"><span class="group-ic">${groupIcon(g)}</span>${esc(g)}</span></td></tr>${groupRows}`;
   }).join('');
   return `<div class="panel ${editing?'editing-mode':''}">
     <div class="panel-head"><h3>Fleet — Asset List</h3><div class="col-actions">${editing?`<button class="col-add-btn" data-add-field="vehicles|vehicles">+ Field</button><button class="btn small" data-add-row="vehicles|vehicles" data-add-defaults='{"rego":"NEW VEHICLE","vehicle_group":"Unassigned"}'>+ Vehicle</button>`:''}${editToggle('fleet')}</div></div>
@@ -530,9 +537,42 @@ function fileExtLabel(url){
   return m ? m[1].toUpperCase() : 'FILE';
 }
 function fileLinkChip(url){
-  if(isImageUrl(url)) return `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" class="payload-thumb payload-thumb-sm"></a>`;
+  if(isImageUrl(url)) return `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" class="payload-thumb payload-thumb-sm" onerror="this.closest('a').outerHTML='<a class=&quot;file-chip&quot; href=&quot;${esc(url)}&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;>Image (preview unavailable) ↗</a>'"></a>`;
+  if(/\.pdf(\?|$)/i.test(url)) return `<a href="${esc(url)}" target="_blank" rel="noopener" class="pdf-preview-wrap"><embed src="${esc(url)}#toolbar=0&view=FitH" type="application/pdf" class="pdf-preview"><span class="pdf-preview-fallback">PDF preview may require sign-in — click to open</span></a>`;
   return `<a class="file-chip" href="${esc(url)}" target="_blank" rel="noopener"><span class="file-chip-ic">${fileExtLabel(url)}</span>Open file ↗</a>`;
 }
+
+/* File upload / replace — uploads to Supabase Storage 'documents' bucket, updates the row's URL column */
+function eFileUpload(table,stateKey,id,key,currentUrl){
+  const inputId = `upl_${table}_${id}_${key}`.replace(/[^a-zA-Z0-9_]/g,'');
+  return `<div class="file-upload-cell">
+    ${currentUrl?fileLinkChip(currentUrl):'<span class="muted">No file</span>'}
+    <label class="btn small file-upload-btn" for="${inputId}">${currentUrl?'Replace':'Upload'}</label>
+    <input type="file" id="${inputId}" class="file-upload-input" accept="application/pdf,image/*"
+      data-eupload-table="${table}" data-eupload-state="${stateKey}" data-eupload-id="${id}" data-eupload-key="${key}" data-eupload-old="${esc(currentUrl||'')}">
+  </div>`;
+}
+async function handleFileUpload(input){
+  const file = input.files?.[0]; if(!file) return;
+  const table = input.dataset.euploadTable, stateKey = input.dataset.euploadState, id = input.dataset.euploadId, key = input.dataset.euploadKey, old = input.dataset.euploadOld;
+  const label = input.previousElementSibling;
+  const origText = label.textContent; label.textContent='Uploading…';
+  const path = `${table}/${id}/${key}-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-]/g,'_')}`;
+  const {error:upErr} = await supabase.storage.from('documents').upload(path,file,{upsert:true});
+  if(upErr){alert('Upload failed: '+upErr.message); label.textContent=origText; return;}
+  const {data:pub} = supabase.storage.from('documents').getPublicUrl(path);
+  const newUrl = pub.publicUrl;
+  const {error} = await supabase.from(table).update({[key]:newUrl}).eq('id',id);
+  if(error){alert('Could not save new file URL: '+error.message); label.textContent=origText; return;}
+  const row = state[stateKey]?.find(r=>r.id===id);
+  if(row) row[key]=newUrl;
+  if(old && old.includes('/documents/')){
+    const oldPath = old.split('/documents/')[1];
+    if(oldPath) supabase.storage.from('documents').remove([oldPath]).catch(()=>{});
+  }
+  render();
+}
+
 
 
 
@@ -661,6 +701,7 @@ function render(){
   document.querySelector('#sendTestEmailBtn')?.addEventListener('click',sendTestEmailCheck);
   document.querySelector('#showMoreBookings')?.addEventListener('click',()=>{state.bookingsShowAll=true;render();});
   document.querySelector('#showLessBookings')?.addEventListener('click',()=>{state.bookingsShowAll=false;render();});
+  document.querySelectorAll('[data-eupload-table]').forEach(el=>el.onchange=()=>handleFileUpload(el));
   wireGenericTable();
 }
 
