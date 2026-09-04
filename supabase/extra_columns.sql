@@ -1,0 +1,13 @@
+alter table bookings add column if not exists extra jsonb not null default '{}'::jsonb;
+alter table vehicle_checks add column if not exists extra jsonb not null default '{}'::jsonb;
+alter table transfer_logs add column if not exists extra jsonb not null default '{}'::jsonb;
+alter table incidents add column if not exists extra jsonb not null default '{}'::jsonb;
+alter table stock_items add column if not exists extra jsonb not null default '{}'::jsonb;
+alter table staff add column if not exists extra jsonb not null default '{}'::jsonb;
+alter table astp_compliance add column if not exists extra jsonb not null default '{}'::jsonb;
+alter table sil_archive add column if not exists extra jsonb not null default '{}'::jsonb;
+alter table support_workers add column if not exists extra jsonb not null default '{}'::jsonb;
+alter table orientation_checklists add column if not exists extra jsonb not null default '{}'::jsonb;
+alter table sil_maintenance_checks add column if not exists extra jsonb not null default '{}'::jsonb;
+alter table first_aid_checks add column if not exists extra jsonb not null default '{}'::jsonb;
+alter table sil_visitor_checkins add column if not exists extra jsonb not null default '{}'::jsonb;
