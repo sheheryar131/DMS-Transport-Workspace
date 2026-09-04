@@ -551,8 +551,8 @@ const pdfThumbState = new Map(); // url -> 'pending' | 'done' | 'failed'
 let pdfjsLibPromise = null;
 function loadPdfJs(){
   if(!pdfjsLibPromise){
-    pdfjsLibPromise = import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.min.mjs').then(lib=>{
-      lib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.min.mjs';
+    pdfjsLibPromise = import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.mjs').then(lib=>{
+      lib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs';
       return lib;
     });
   }
@@ -570,12 +570,16 @@ async function processPdfThumbs(){
   for(const wrap of wraps){
     const url = wrap.dataset.pdfUrl;
     const cached = pdfThumbState.get(url);
-    if(cached==='failed') continue;
+    if(cached==='failed'){ markFailed(wrap); continue; }
     if(cached==='done'){ paintCachedThumb(wrap,url); continue; }
     if(cached==='pending') continue;
     pdfThumbState.set(url,'pending');
     renderOnePdfThumb(wrap,url);
   }
+}
+function markFailed(wrap){
+  const fallback = wrap.querySelector('.pdf-chip-fallback');
+  if(fallback) fallback.innerHTML = `<span class="file-chip-ic">PDF</span>Open file ↗ <span class="pdf-fail-note">(no inline preview)</span>`;
 }
 const pdfThumbDataUrls = new Map();
 function paintCachedThumb(wrap,url){
@@ -587,7 +591,7 @@ function paintCachedThumb(wrap,url){
 async function renderOnePdfThumb(wrap,url){
   try{
     const lib = await loadPdfJs();
-    const res = await fetch(url); if(!res.ok) throw new Error('fetch failed');
+    const res = await fetch(url); if(!res.ok) throw new Error('HTTP '+res.status);
     const buf = await res.arrayBuffer();
     const pdf = await lib.getDocument({data:buf}).promise;
     const page = await pdf.getPage(1);
@@ -595,7 +599,7 @@ async function renderOnePdfThumb(wrap,url){
     const scale = 130/viewport.width;
     const scaledViewport = page.getViewport({scale});
     const canvas = document.createElement('canvas');
-    canvas.width = scaledViewport.width; canvas.height = scaledViewport.height;
+    canvas.width = Math.ceil(scaledViewport.width); canvas.height = Math.ceil(scaledViewport.height);
     const ctx = canvas.getContext('2d');
     await page.render({canvasContext:ctx, viewport:scaledViewport}).promise;
     const dataUrl = canvas.toDataURL('image/png');
@@ -603,7 +607,9 @@ async function renderOnePdfThumb(wrap,url){
     pdfThumbState.set(url,'done');
     document.querySelectorAll(`[data-pdf-url="${CSS.escape(url)}"]`).forEach(w=>paintCachedThumb(w,url));
   }catch(e){
+    console.warn('PDF preview failed for', url, '—', e.message||e);
     pdfThumbState.set(url,'failed');
+    document.querySelectorAll(`[data-pdf-url="${CSS.escape(url)}"]`).forEach(w=>markFailed(w));
   }
 }
 
