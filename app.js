@@ -56,8 +56,11 @@ const rowStatusClass = s => {
   return '';
 };
 
+let firstLoad = true;
+
 async function loadData(){
-  state.loading=true; state.error=''; render();
+  if(firstLoad){ app.innerHTML = splashScreen(); }
+  state.loading=true; state.error=''; if(!firstLoad) render();
   const queries = await Promise.all([
     supabase.from('bookings').select('*').order('booking_date',{ascending:false}).limit(500),
     supabase.from('staff').select('*').order('name'),
@@ -77,7 +80,17 @@ async function loadData(){
   [state.bookings,state.staff,state.vehicles,state.checks,state.transfers,state.incidents,state.stock,state.astp,state.orientation,state.silMaintenance,state.firstAid,state.silVisitors] = queries.map(q=>q.data||[]);
   const {data:ns} = await supabase.from('notification_settings').select('*').eq('entity_type','vehicle_expiry').maybeSingle();
   state.notificationSettings = ns;
-  state.loading=false; render();
+  state.loading=false; firstLoad=false; render();
+}
+
+function splashScreen(){
+  return `<div class="splash-screen">
+    <div class="splash-ring-wrap">
+      <div class="splash-ring"></div>
+      <img class="splash-logo" src="https://dmsassistedtransport.com.au/wp-content/uploads/2025/09/favicon-300x300.jpg" alt="DMS" onerror="this.style.display='none'">
+    </div>
+    <div class="splash-text">Loading DMS Workspace…</div>
+  </div>`;
 }
 
 function shell(body){
@@ -175,10 +188,24 @@ async function genericDeleteField(table,stateKey,key){
   render();
 }
 
+function popOutField(el){
+  if(el.tagName==='SELECT') return; // selects open their own dropdown, no need to pop
+  const rect = el.getBoundingClientRect();
+  el.classList.add('popped-field');
+  el.style.left = rect.left+'px'; el.style.top = rect.top+'px'; el.style.width = Math.max(rect.width,220)+'px';
+}
+function unpopField(el){
+  el.classList.remove('popped-field');
+  el.style.left=''; el.style.top=''; el.style.width='';
+}
+
 function wireGenericTable(){
   document.querySelectorAll('[data-etable]').forEach(el=>{
-    if(el.dataset.eextra) el.onchange=()=>genericFieldChange(el);
-    else el.onchange=()=>genericFieldChange(el);
+    el.onchange=()=>genericFieldChange(el);
+    if(el.tagName==='INPUT' || el.tagName==='SELECT'){
+      el.addEventListener('focus',()=>popOutField(el));
+      el.addEventListener('blur',()=>unpopField(el));
+    }
   });
   document.querySelectorAll('[data-edit-toggle]').forEach(btn=>btn.onclick=()=>{
     const k=btn.dataset.editToggle; editState[k]=!editState[k]; render();
@@ -578,8 +605,7 @@ async function processPdfThumbs(){
   }
 }
 function markFailed(wrap){
-  const fallback = wrap.querySelector('.pdf-chip-fallback');
-  if(fallback) fallback.innerHTML = `<span class="file-chip-ic">PDF</span>Open file ↗ <span class="pdf-fail-note">(no inline preview)</span>`;
+  // Fallback chip already shows "Open file" — nothing extra to change on failure.
 }
 const pdfThumbDataUrls = new Map();
 function paintCachedThumb(wrap,url){
