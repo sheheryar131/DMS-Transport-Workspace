@@ -15,7 +15,7 @@ const pages = {
   staff:['Staff','Staff directory'],
   astp:['ASTP Staff List','Driver compliance and documents'],
   incidents:['Incident & Hazard Reporting','Open → In Review → Closed'],
-  integrations:['Integrations','Jotform, Supabase and automation status'],
+  integrations:['Automations','Automated processes running in the background'],
   sil:['SIL & Care Compliance','Orientation, maintenance, first aid and visitor logs']
 };
 const navIcons = {
@@ -31,7 +31,7 @@ const navIcons = {
   sil:'<svg viewBox="0 0 24 24" class="ic" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>',
   integrations:'<svg viewBox="0 0 24 24" class="ic" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
 };
-const nav=[['dashboard','Dashboard'],['bookings','Master Bookings'],['checks','Daily Vehicle Checks'],['transfers','Transfer Forms'],['fleet','Fleet'],['stock','Stock'],['staff','Staff'],['astp','ASTP Compliance'],['incidents','Incidents'],['sil','SIL & Care'],['integrations','Integrations']];
+const nav=[['dashboard','Dashboard'],['bookings','Master Bookings'],['checks','Daily Vehicle Checks'],['transfers','Transfer Forms'],['fleet','Fleet'],['stock','Stock'],['staff','Staff'],['astp','ASTP Compliance'],['incidents','Incidents'],['sil','SIL & Care'],['integrations','Automations']];
 
 const state = {
   current:'dashboard', loading:false, error:'',
@@ -102,7 +102,7 @@ async function refreshWithSplash(){
   const start = Date.now();
   await loadData();
   const elapsed = Date.now()-start;
-  const wait = Math.max(0, 3000-elapsed);
+  const wait = Math.max(0, 1000-elapsed);
   setTimeout(()=>el.remove(), wait);
 }
 
@@ -244,17 +244,20 @@ function wireGenericTable(){
 
 /* ===================== Dashboard ===================== */
 
-function floatIcons(svgIcon, count, extraClass=''){
-  let out='';
-  for(let i=0;i<count;i++){
-    const delay=(i*0.35).toFixed(2), top=10+Math.random()*60, dur=(2.2+Math.random()*1.2).toFixed(2);
-    out+=`<span class="float-ic ${extraClass}" style="top:${top}%;animation-delay:${delay}s;animation-duration:${dur}s">${svgIcon}</span>`;
-  }
-  return out;
-}
 const CHECK_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M4 12l6 6L20 6"/></svg>';
-const WARN_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>';
-const DOT_ICON='<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>';
+const BELL_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+const KEYFOB_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="10" height="16" rx="4"/><circle cx="12" cy="7" r="1.4" fill="currentColor" stroke="none" class="kf-btn"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><path d="M10 21l2 2 2-2"/></svg>';
+const PHONE_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>';
+const DBLCHECK_ICON1='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M2 12l5 5L18 6"/></svg>';
+const DBLCHECK_ICON2='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M8 12l5 5L24 6"/></svg>';
+
+function cardIcon(kind,extraClass){
+  if(kind==='bell') return `<span class="card-anim-ic ${extraClass}"><span class="anim-bell">${BELL_ICON}</span></span>`;
+  if(kind==='keyfob') return `<span class="card-anim-ic ${extraClass}"><span class="anim-keyfob">${KEYFOB_ICON}</span><span class="anim-wave"></span></span>`;
+  if(kind==='phone') return `<span class="card-anim-ic ${extraClass}"><span class="anim-phone">${PHONE_ICON}</span><span class="anim-badge">${CHECK_ICON}</span></span>`;
+  if(kind==='dblcheck') return `<span class="card-anim-ic ${extraClass}"><span class="anim-tick anim-tick1">${DBLCHECK_ICON1}</span><span class="anim-tick anim-tick2">${DBLCHECK_ICON2}</span></span>`;
+  return '';
+}
 
 function dashboard(){
   const today = new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Sydney'}).format(new Date());
@@ -275,16 +278,13 @@ function dashboard(){
   const remaining = state.bookings.length - recentRows.length;
 
   const animating = (Date.now()-(state.refreshedAt||0)) < 5000;
-  const vehIcons = animating && state.vehicles.length>0 ? floatIcons([groupIcon('SUV'),groupIcon('LDV VAN'),groupIcon('Hatchback')][Math.floor(Math.random()*3)],4,'float-ic-blue') : '';
-  const bookIcons = animating && todays.length>0 ? floatIcons(DOT_ICON,5,'float-ic-teal') : '';
-  const checkIcons = animating && todayChecks.length>0 ? floatIcons(CHECK_ICON,5,'float-ic-green') : '';
-  const incIcons = animating && openInc>0 ? floatIcons(WARN_ICON,4,'float-ic-red') : '';
+  const auto = animating ? 'auto-play' : '';
 
   return `<div class="cards">
-    <div class="card">${bookIcons}<div class="metric-label">Today's bookings</div><div class="metric-value">${todays.length}</div><div class="metric-sub">Live from Supabase</div></div>
-    <div class="card c-blue">${vehIcons}<div class="metric-label">Fleet vehicles</div><div class="metric-value">${state.vehicles.length}</div><div class="metric-sub">${expiringVehicles.length} expiry alert${expiringVehicles.length===1?'':'s'} within 30 days</div></div>
-    <div class="card">${checkIcons}<div class="metric-label">Today's checks</div><div class="metric-value">${todayChecks.length}</div><div class="metric-sub">Pre-start + post-shift</div></div>
-    <div class="card c-red">${incIcons}<div class="metric-label">Open incidents</div><div class="metric-value">${openInc}</div><div class="metric-sub">Open / In Review</div></div>
+    <div class="card">${cardIcon('phone',auto)}<div class="metric-label">Today's bookings</div><div class="metric-value">${todays.length}</div><div class="metric-sub">Live from Supabase</div></div>
+    <div class="card c-blue">${cardIcon('keyfob',auto)}<div class="metric-label">Fleet vehicles</div><div class="metric-value">${state.vehicles.length}</div><div class="metric-sub">${expiringVehicles.length} expiry alert${expiringVehicles.length===1?'':'s'} within 30 days</div></div>
+    <div class="card">${cardIcon('dblcheck',auto)}<div class="metric-label">Today's checks</div><div class="metric-value">${todayChecks.length}</div><div class="metric-sub">Pre-start + post-shift</div></div>
+    <div class="card c-red">${cardIcon('bell',auto)}<div class="metric-label">Open incidents</div><div class="metric-value">${openInc}</div><div class="metric-sub">Open / In Review</div></div>
   </div>
   <div class="grid-2">
     <div class="panel"><div class="panel-head"><h3>Recent bookings</h3></div>
@@ -773,17 +773,15 @@ function genericDetailModal(table,id){
 /* ===================== Integrations ===================== */
 
 function integrations(){
-  const ns = state.notificationSettings || {threshold_days:[30,14],recipient_email:'transport@dmscare.com.au',enabled:true};
-  return `<div class="grid-2"><div class="panel"><div class="panel-head"><h3>Connections</h3></div><div class="panel-body"><div class="connection"><strong>Supabase / PostgreSQL</strong><span class="ok">Connected</span></div><div class="connection"><strong>Supabase Auth</strong><span class="ok">Connected</span></div><div class="connection"><strong>GitHub</strong><span class="ok">Source controlled</span></div><div class="connection"><strong>Netlify</strong><span class="ok">Git deploy</span></div><div class="connection"><strong>Jotform</strong><span class="ok">10 forms wired</span></div><div class="connection"><strong>Email alerts (Resend)</strong><span class="ok">Daily @ scheduled</span></div></div></div>
-  <div class="panel"><div class="panel-head"><h3>Vehicle expiry alerts</h3></div><div class="panel-body">
+  const ns = state.notificationSettings || {threshold_days:[30,14]};
+  return `<div class="panel"><div class="panel-body">
+    <div class="connection"><strong>Jotform Integration</strong><span class="ok">Active</span></div>
+    <div class="connection"><strong>Vehicle Expiry Alert</strong><span class="warn">In Progress</span></div>
     <form id="notifSettingsForm" class="form-grid">
-      <label class="span-2">Send alerts to<input name="recipient_email" value="${esc(ns.recipient_email)}" type="email" required></label>
-      <label class="span-2">Alert this many days before expiry (comma-separated, e.g. 30,14,7)<input name="threshold_days" value="${esc((ns.threshold_days||[]).join(','))}" required></label>
-      <label>Enabled<select name="enabled"><option value="true" ${ns.enabled?'selected':''}>Yes</option><option value="false" ${!ns.enabled?'selected':''}>No</option></select></label>
-      <div class="span-2 modal-actions"><button type="button" class="btn" id="sendTestEmailBtn">Send test check now</button><button class="btn primary" type="submit">Save settings</button></div>
+      <label class="span-2">Alert Email Interval (days before expiry, comma-separated e.g. 30,14,7)<input name="threshold_days" value="${esc((ns.threshold_days||[]).join(','))}" required></label>
+      <div class="span-2 modal-actions"><button class="btn primary" type="submit">Save</button></div>
     </form>
-    <p class="note">Checks Registration and HVIS expiry dates on every vehicle in the Fleet daily, and emails an alert the moment a vehicle crosses one of the day thresholds above. Add or remove thresholds any time — no code changes needed.</p>
-  </div></div></div>`;
+  </div></div>`;
 }
 
 async function updateBookingStatus(id,status){
@@ -796,8 +794,7 @@ async function saveNotificationSettings(e){
   e.preventDefault();
   const f=new FormData(e.target);
   const threshold_days=f.get('threshold_days').split(',').map(s=>parseInt(s.trim(),10)).filter(n=>Number.isFinite(n)&&n>0);
-  const payload={recipient_email:f.get('recipient_email'),threshold_days,enabled:f.get('enabled')==='true'};
-  const {data,error}=await supabase.from('notification_settings').update(payload).eq('entity_type','vehicle_expiry').select().single();
+  const {data,error}=await supabase.from('notification_settings').update({threshold_days}).eq('entity_type','vehicle_expiry').select().single();
   if(error){alert('Could not save: '+error.message);return;}
   state.notificationSettings=data;
   alert('Saved.');
@@ -835,7 +832,6 @@ function render(){
   document.querySelector('#newBookingBtn')?.addEventListener('click',newBookingModal);
   document.querySelectorAll('[data-detail-table]').forEach(tr=>tr.onclick=()=>genericDetailModal(tr.dataset.detailTable,tr.dataset.detailId));
   document.querySelector('#notifSettingsForm')?.addEventListener('submit',saveNotificationSettings);
-  document.querySelector('#sendTestEmailBtn')?.addEventListener('click',sendTestEmailCheck);
   document.querySelector('#showMoreBookings')?.addEventListener('click',()=>{state.bookingsShowAll=true;render();});
   document.querySelector('#showLessBookings')?.addEventListener('click',()=>{state.bookingsShowAll=false;render();});
   document.querySelectorAll('[data-eupload-table]').forEach(el=>el.onchange=()=>handleFileUpload(el));

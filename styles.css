@@ -258,17 +258,36 @@ th.col-removable:hover .col-del-x{opacity:1}
 @keyframes splashPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
 .splash-text{font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.02em}
 
-/* ===== Dashboard card float-in animations (first 5s after refresh) ===== */
-.float-ic{position:absolute;width:26px;height:26px;left:-30px;opacity:0;pointer-events:none;animation-name:floatAcross;animation-timing-function:ease-in-out;animation-iteration-count:1;animation-fill-mode:forwards}
-.float-ic svg{width:100%;height:100%}
-@keyframes floatAcross{
-  0%{left:-30px;opacity:0;transform:translateY(0) rotate(-6deg)}
-  12%{opacity:.9}
-  50%{transform:translateY(-6px) rotate(4deg)}
-  88%{opacity:.9}
-  100%{left:110%;opacity:0;transform:translateY(0) rotate(-3deg)}
-}
-.float-ic-blue{color:var(--teal)}
-.float-ic-teal{color:#5B9BD5}
-.float-ic-green{color:var(--success)}
-.float-ic-red{color:var(--danger)}
+/* ===== Dashboard card signature icon animations =====
+   Auto-plays once on refresh (.auto-play), and replays on hover any time after. */
+.card-anim-ic{position:absolute;top:14px;right:16px;width:34px;height:34px;color:#fff;opacity:.92;pointer-events:none}
+.card.c-blue .card-anim-ic,.card.c-red .card-anim-ic{color:#fff}
+.card:not(.c-blue):not(.c-red) .card-anim-ic{color:var(--teal)}
+
+/* Bell (incidents) */
+.anim-bell{display:block;width:100%;height:100%;transform-origin:50% 10%}
+.card-anim-ic.auto-play .anim-bell{animation:bellRing 1s ease-in-out 2}
+.card:hover .anim-bell{animation:bellRing 1s ease-in-out 2}
+@keyframes bellRing{0%,100%{transform:rotate(0)}15%{transform:rotate(18deg)}30%{transform:rotate(-15deg)}45%{transform:rotate(10deg)}60%{transform:rotate(-8deg)}75%{transform:rotate(4deg)}}
+
+/* Key fob (fleet) */
+.anim-keyfob{display:block;width:100%;height:100%;position:relative}
+.anim-wave{position:absolute;inset:-6px;border:2px solid currentColor;border-radius:50%;opacity:0}
+.card-anim-ic.auto-play .anim-wave,.card:hover .anim-wave{animation:kfWave 1.4s ease-out 2}
+.card-anim-ic.auto-play .kf-btn,.card:hover .kf-btn{animation:kfPress 1.4s ease-in-out 2}
+@keyframes kfWave{0%{transform:scale(.4);opacity:.9}70%{opacity:0}100%{transform:scale(1.5);opacity:0}}
+@keyframes kfPress{0%,100%{opacity:1}20%{opacity:.3}25%{opacity:1}}
+
+/* Phone booking */
+.anim-phone{display:block;width:100%;height:100%}
+.anim-badge{position:absolute;bottom:-2px;right:-4px;width:16px;height:16px;background:var(--success);border-radius:50%;color:#fff;padding:3px;box-sizing:border-box;transform:scale(0);box-shadow:0 0 0 2px rgba(255,255,255,.6)}
+.card-anim-ic.auto-play .anim-badge,.card:hover .anim-badge{animation:badgePop .9s cubic-bezier(.34,1.56,.64,1) 1 .3s forwards}
+@keyframes badgePop{0%{transform:scale(0) rotate(-30deg)}70%{transform:scale(1.2) rotate(6deg)}100%{transform:scale(1) rotate(0)}}
+
+/* Double check */
+.anim-tick{position:absolute;top:0;width:100%;height:100%;opacity:0}
+.anim-tick1{left:-6px}
+.anim-tick2{left:6px}
+.card-anim-ic.auto-play .anim-tick1,.card:hover .anim-tick1{animation:tickIn .5s ease-out 1 forwards}
+.card-anim-ic.auto-play .anim-tick2,.card:hover .anim-tick2{animation:tickIn .5s ease-out 1 .22s forwards}
+@keyframes tickIn{0%{opacity:0;transform:translateX(-8px) scale(.6)}100%{opacity:1;transform:translateX(0) scale(1)}}
