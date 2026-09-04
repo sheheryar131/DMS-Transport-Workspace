@@ -218,6 +218,7 @@ th.col-removable:hover .col-del-x{opacity:1}
 .pdf-fail-note{opacity:.75;font-weight:500;font-size:11px}
 .pdf-thumb-wrap{display:inline-block}
 .pdf-canvas-link{display:block;width:fit-content}
+.pdf-canvas-link[hidden]{display:none}
 .pdf-thumb-canvas{max-width:130px;border-radius:8px;border:1px solid var(--line);box-shadow:var(--shadow-sm);display:block;transition:transform .15s var(--ease)}
 .pdf-canvas-link:hover .pdf-thumb-canvas{transform:scale(1.04);box-shadow:var(--shadow)}
 
