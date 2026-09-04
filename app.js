@@ -255,7 +255,7 @@ function bookingsPage(){
       <td>${editing?eText('bookings','bookings',b.id,'pickup_location',b.pickup_location):esc(b.pickup_location||'—')}</td>
       <td>${editing?eText('bookings','bookings',b.id,'dropoff_location',b.dropoff_location):esc(b.dropoff_location||'—')}</td>
       <td>${eStaffSelect('bookings','bookings',b.id,'driver_id',b.driver_id,{disabled:false})}</td>
-      <td>${editing?eSelect('bookings','bookings',b.id,'vehicle_id',state.vehicles.map(v=>({value:v.id,label:v.rego})),{}):''}${editing?'':esc(vehicleRego(b.vehicle_id))}</td>
+      <td>${editing?eSelect('bookings','bookings',b.id,'vehicle_id',b.vehicle_id,state.vehicles.map(v=>({value:v.id,label:v.rego})),{}):esc(vehicleRego(b.vehicle_id))}</td>
       <td>${editing?eSelect('bookings','bookings',b.id,'funding_type',b.funding_type,FUNDING_OPTS,{}):esc(b.funding_type||'—')}</td>
       <td>${eSelect('bookings','bookings',b.id,'status',b.status,BOOKING_STATUS_OPTS,{blank:false})}</td>
       ${extraKeys.map(k=>`<td>${eExtra('bookings','bookings',b.id,k,(b.extra||{})[k],{disabled:!editing})}</td>`).join('')}
@@ -436,12 +436,14 @@ function groupIcon(name){
   return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13l2-6a2 2 0 0 1 2-1h10a2 2 0 0 1 2 1l2 6"/><rect x="1" y="13" width="22" height="6" rx="1"/><circle cx="6.5" cy="19.5" r="1.5"/><circle cx="17.5" cy="19.5" r="1.5"/></svg>';
 }
 
+const MONDAY_GROUP_COLORS = ['#0086C0','#A25DDC','#FF7575','#00C875','#FDAB3D','#579BFC','#BB3354'];
 function fleetPage(){
   const editing = !!editState.fleet;
   const extraKeys=extraKeysOf(state.vehicles);
   const groups=[...new Set(state.vehicles.map(v=>v.vehicle_group||'Unassigned'))];
   const cols=['Rego','Group','Status','Make / Model','Year','VIN','Rego Expiry','HVIS Expiry','ASTP Usage','App. Pack','Emergency Equip.','Epi-Pen','Warning Signage','Odometer','Notes',...extraKeys];
-  const rowsHtml = groups.map(g=>{
+  const rowsHtml = groups.map((g,gi)=>{
+    const groupColor = MONDAY_GROUP_COLORS[gi % MONDAY_GROUP_COLORS.length];
     const groupRows = state.vehicles.filter(v=>(v.vehicle_group||'Unassigned')===g).map(v=>`<tr>
       <td>${editing?eText('vehicles','vehicles',v.id,'rego',v.rego):`<strong>${esc(v.rego)}</strong>`}</td>
       <td>${editing?eSelect('vehicles','vehicles',v.id,'vehicle_group',v.vehicle_group,VEHICLE_GROUP_OPTS):esc(v.vehicle_group||'—')}</td>
@@ -461,11 +463,11 @@ function fleetPage(){
       ${extraKeys.map(k=>`<td>${eExtra('vehicles','vehicles',v.id,k,(v.extra||{})[k],{disabled:!editing})}</td>`).join('')}
       ${editing?`<td><button class="btn small danger" data-del-row="vehicles|vehicles|${v.id}">Del</button></td>`:''}
     </tr>`).join('');
-    return `<tr class="group-row"><td colspan="${cols.length+(editing?1:0)}"><span class="group-title"><span class="group-ic">${groupIcon(g)}</span>${esc(g)}</span></td></tr>${groupRows}`;
+    return `<tr class="group-row" style="--gcolor:${groupColor}"><td colspan="${cols.length+(editing?1:0)}" style="background:${groupColor}"><span class="group-title"><span class="group-ic">${groupIcon(g)}</span>${esc(g)} <span class="group-count">${state.vehicles.filter(v=>(v.vehicle_group||'Unassigned')===g).length}</span></span></td></tr>${groupRows}`;
   }).join('');
   return `<div class="panel ${editing?'editing-mode':''}">
     <div class="panel-head"><h3>Fleet — Asset List</h3><div class="col-actions">${editing?`<button class="col-add-btn" data-add-field="vehicles|vehicles">+ Field</button><button class="btn small" data-add-row="vehicles|vehicles" data-add-defaults='{"rego":"NEW VEHICLE","vehicle_group":"Unassigned"}'>+ Vehicle</button>`:''}${editToggle('fleet')}</div></div>
-    <div class="table-wrap"><table class="table"><thead><tr>${cols.map(c=>{
+    <div class="table-wrap"><table class="table fleet-table"><thead><tr>${cols.map(c=>{
       const isExtra=extraKeys.includes(c);
       return isExtra&&editing?`<th class="col-removable">${esc(c)}<button class="col-del-x" data-del-field="vehicles|vehicles|${esc(c)}">×</button></th>`:`<th>${esc(c)}</th>`;
     }).join('')}${editing?'<th></th>':''}</tr></thead><tbody>${rowsHtml}</tbody></table></div>
