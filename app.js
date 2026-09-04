@@ -80,7 +80,8 @@ async function loadData(){
   [state.bookings,state.staff,state.vehicles,state.checks,state.transfers,state.incidents,state.stock,state.astp,state.orientation,state.silMaintenance,state.firstAid,state.silVisitors] = queries.map(q=>q.data||[]);
   const {data:ns} = await supabase.from('notification_settings').select('*').eq('entity_type','vehicle_expiry').maybeSingle();
   state.notificationSettings = ns;
-  state.loading=false; firstLoad=false; render();
+  state.loading=false; firstLoad=false; state.refreshedAt=Date.now(); render();
+  setTimeout(()=>{ if(state.current==='dashboard') render(); }, 5000);
 }
 
 function splashScreen(){
@@ -93,9 +94,21 @@ function splashScreen(){
   </div>`;
 }
 
+async function refreshWithSplash(){
+  const overlay = document.createElement('div');
+  overlay.innerHTML = splashScreen();
+  const el = overlay.firstElementChild;
+  document.body.appendChild(el);
+  const start = Date.now();
+  await loadData();
+  const elapsed = Date.now()-start;
+  const wait = Math.max(0, 3000-elapsed);
+  setTimeout(()=>el.remove(), wait);
+}
+
 function shell(body){
   const [title,sub] = pages[state.current];
-  return `<div class="app-shell"><aside class="sidebar">
+  return `<div class="bg-blobs"></div><div class="app-shell"><aside class="sidebar">
     <div class="brand"><img class="brand-mark brand-logo" src="https://dmsassistedtransport.com.au/wp-content/uploads/2025/09/favicon-300x300.jpg" alt="DMS" onerror="this.outerHTML='<div class=&quot;brand-mark&quot;>D</div>'">DMS Workspace</div>
     <div class="nav-section">Operations</div>
     ${nav.map(([id,n])=>`<div class="nav-item ${id===state.current?'active':''}" data-page="${id}">${navIcons[id]}${n}</div>`).join('')}
@@ -231,30 +244,56 @@ function wireGenericTable(){
 
 /* ===================== Dashboard ===================== */
 
+function floatIcons(svgIcon, count, extraClass=''){
+  let out='';
+  for(let i=0;i<count;i++){
+    const delay=(i*0.35).toFixed(2), top=10+Math.random()*60, dur=(2.2+Math.random()*1.2).toFixed(2);
+    out+=`<span class="float-ic ${extraClass}" style="top:${top}%;animation-delay:${delay}s;animation-duration:${dur}s">${svgIcon}</span>`;
+  }
+  return out;
+}
+const CHECK_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M4 12l6 6L20 6"/></svg>';
+const WARN_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>';
+const DOT_ICON='<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>';
+
 function dashboard(){
   const today = new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Sydney'}).format(new Date());
   const todays = state.bookings.filter(b=>b.booking_date===today);
   const openInc = state.incidents.filter(x=>x.status!=='Closed').length;
   const todayChecks=state.checks.filter(x=>x.check_date===today);
-  const expiring=state.vehicles.filter(v=>[v.rego_expiry,v.hvis_expiry].some(d=>d && (new Date(d)-new Date())/86400000<=30 && new Date(d)>=new Date())).length;
+  const daysUntil = d => d ? Math.round((new Date(d)-new Date())/86400000) : null;
+  const expiringVehicles = state.vehicles
+    .map(v=>{
+      const rd=daysUntil(v.rego_expiry), hd=daysUntil(v.hvis_expiry);
+      const soonest = [['Registration',v.rego_expiry,rd],['HVIS',v.hvis_expiry,hd]].filter(x=>x[2]!=null && x[2]<=30 && x[2]>=0).sort((a,b)=>a[2]-b[2])[0];
+      return soonest ? {rego:v.rego, label:soonest[0], date:soonest[1], days:soonest[2]} : null;
+    })
+    .filter(Boolean).sort((a,b)=>a.days-b.days).slice(0,5);
+  const astpComplete = state.astp.filter(a=>[a.driver_application_url,a.medical_fitness_url,a.wwc_url,a.drivers_licence_url].every(Boolean)).length;
   const showN = state.bookingsShowAll ? state.bookings.length : 3;
   const recentRows = state.bookings.slice(0,showN);
   const remaining = state.bookings.length - recentRows.length;
+
+  const animating = (Date.now()-(state.refreshedAt||0)) < 5000;
+  const vehIcons = animating && state.vehicles.length>0 ? floatIcons([groupIcon('SUV'),groupIcon('LDV VAN'),groupIcon('Hatchback')][Math.floor(Math.random()*3)],4,'float-ic-blue') : '';
+  const bookIcons = animating && todays.length>0 ? floatIcons(DOT_ICON,5,'float-ic-teal') : '';
+  const checkIcons = animating && todayChecks.length>0 ? floatIcons(CHECK_ICON,5,'float-ic-green') : '';
+  const incIcons = animating && openInc>0 ? floatIcons(WARN_ICON,4,'float-ic-red') : '';
+
   return `<div class="cards">
-    <div class="card"><div class="metric-label">Today's bookings</div><div class="metric-value">${todays.length}</div><div class="metric-sub">Live from Supabase</div></div>
-    <div class="card c-blue"><div class="metric-label">Fleet vehicles</div><div class="metric-value">${state.vehicles.length}</div><div class="metric-sub">${expiring} expiry alert${expiring===1?'':'s'} within 30 days</div></div>
-    <div class="card"><div class="metric-label">Today's checks</div><div class="metric-value">${todayChecks.length}</div><div class="metric-sub">Pre-start + post-shift</div></div>
-    <div class="card c-red"><div class="metric-label">Open incidents</div><div class="metric-value">${openInc}</div><div class="metric-sub">Open / In Review</div></div>
+    <div class="card">${bookIcons}<div class="metric-label">Today's bookings</div><div class="metric-value">${todays.length}</div><div class="metric-sub">Live from Supabase</div></div>
+    <div class="card c-blue">${vehIcons}<div class="metric-label">Fleet vehicles</div><div class="metric-value">${state.vehicles.length}</div><div class="metric-sub">${expiringVehicles.length} expiry alert${expiringVehicles.length===1?'':'s'} within 30 days</div></div>
+    <div class="card">${checkIcons}<div class="metric-label">Today's checks</div><div class="metric-value">${todayChecks.length}</div><div class="metric-sub">Pre-start + post-shift</div></div>
+    <div class="card c-red">${incIcons}<div class="metric-label">Open incidents</div><div class="metric-value">${openInc}</div><div class="metric-sub">Open / In Review</div></div>
   </div>
-  <div class="panel"><div class="panel-head"><h3>Recent bookings</h3></div>
-    ${recentRows.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>Booking</th><th>Passenger</th><th>Date</th><th>Driver</th><th>Status</th></tr></thead><tbody>${recentRows.map(b=>`<tr class="${rowStatusClass(b.status)}"><td><strong>${esc(b.booking_code)}</strong></td><td>${esc(b.passenger_name||'—')}</td><td>${fmtDate(b.booking_date)}</td><td>${esc(personName(b.driver_id))}</td><td>${badge(b.status)}</td></tr>`).join('')}${remaining>0?`<tr class="show-more-row"><td colspan="5"><button class="link-btn" id="showMoreBookings">Show ${remaining} more →</button></td></tr>`:(state.bookingsShowAll && state.bookings.length>3?`<tr class="show-more-row"><td colspan="5"><button class="link-btn" id="showLessBookings">Show less</button></td></tr>`:'')}</tbody></table></div>` : '<div class="empty">No bookings yet.</div>'}
-  </div>
-  <div class="system-status-section"><div class="section-label">Dev / Testing — remove before go-live</div>
-    <div class="panel"><div class="panel-head"><h3>System status</h3></div><div class="panel-body">
-      <div class="connection"><strong>Supabase database</strong><span class="ok">Connected</span></div>
-      <div class="connection"><strong>Jotform ingestion</strong><span class="ok">8 forms wired</span></div>
-      <div class="connection"><strong>Monday migration</strong><span class="ok">Complete</span></div>
-      <div class="connection"><strong>Login / security</strong><span class="warn">Disabled for testing</span></div>
+  <div class="grid-2">
+    <div class="panel"><div class="panel-head"><h3>Recent bookings</h3></div>
+      ${recentRows.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>Booking</th><th>Passenger</th><th>Date</th><th>Driver</th><th>Status</th></tr></thead><tbody>${recentRows.map(b=>`<tr class="${rowStatusClass(b.status)}"><td><strong>${esc(b.booking_code)}</strong></td><td>${esc(b.passenger_name||'—')}</td><td>${fmtDate(b.booking_date)}</td><td>${esc(personName(b.driver_id))}</td><td>${badge(b.status)}</td></tr>`).join('')}${remaining>0?`<tr class="show-more-row"><td colspan="5"><button class="link-btn" id="showMoreBookings">Show ${remaining} more →</button></td></tr>`:(state.bookingsShowAll && state.bookings.length>3?`<tr class="show-more-row"><td colspan="5"><button class="link-btn" id="showLessBookings">Show less</button></td></tr>`:'')}</tbody></table></div>` : '<div class="empty">No bookings yet.</div>'}
+    </div>
+    <div class="panel"><div class="panel-head"><h3>Fleet &amp; Compliance Snapshot</h3></div><div class="panel-body">
+      ${expiringVehicles.length ? expiringVehicles.map(v=>`<div class="connection"><strong>${esc(v.rego)}</strong><span class="${v.days<=7?'warn':''}" style="${v.days<=7?'':'color:var(--muted)'}">${esc(v.label)} in ${v.days}d (${fmtDate(v.date)})</span></div>`).join('') : '<div class="connection"><strong>No expiries due soon</strong><span class="ok">All clear</span></div>'}
+      <div class="connection"><strong>ASTP document completeness</strong><span class="${astpComplete===state.astp.length?'ok':'warn'}">${astpComplete} / ${state.astp.length} complete</span></div>
+      <div class="connection"><strong>Stock items tracked</strong><span>${state.stock.length}</span></div>
     </div></div>
   </div>`;
 }
@@ -792,7 +831,7 @@ function render(){
   else body=integrations();
   app.innerHTML=shell(body);
   document.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>{state.current=x.dataset.page;render()});
-  document.querySelector('#refreshBtn').onclick=loadData;
+  document.querySelector('#refreshBtn').onclick=refreshWithSplash;
   document.querySelector('#newBookingBtn')?.addEventListener('click',newBookingModal);
   document.querySelectorAll('[data-detail-table]').forEach(tr=>tr.onclick=()=>genericDetailModal(tr.dataset.detailTable,tr.dataset.detailId));
   document.querySelector('#notifSettingsForm')?.addEventListener('submit',saveNotificationSettings);
