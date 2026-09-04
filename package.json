@@ -1,0 +1,12 @@
+{
+  "name": "dms-transport-workspace",
+  "private": true,
+  "version": "1.0.0",
+  "description": "DMS Transport Workspace. Netlify serves this as a static site + Functions in production. replit-server.js is only for Replit UI testing.",
+  "scripts": {
+    "start": "node replit-server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
