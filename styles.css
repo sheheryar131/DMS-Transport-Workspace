@@ -260,9 +260,10 @@ th.col-removable:hover .col-del-x{opacity:1}
 
 /* ===== Dashboard card signature icon animations =====
    Auto-plays once on refresh (.auto-play), and replays on hover any time after. */
-.card-anim-ic{position:absolute;top:14px;right:16px;width:34px;height:34px;color:#fff;opacity:.92;pointer-events:none}
-.card.c-blue .card-anim-ic,.card.c-red .card-anim-ic{color:#fff}
-.card:not(.c-blue):not(.c-red) .card-anim-ic{color:var(--teal)}
+.card-anim-ic{position:absolute;top:14px;right:16px;width:34px;height:34px;opacity:.92;pointer-events:none;color:var(--teal)}
+.card.c-blue .card-anim-ic{color:var(--info)}
+.card.c-red .card-anim-ic{color:var(--danger)}
+.card.c-amber .card-anim-ic{color:var(--ochre)}
 
 /* Bell (incidents) */
 .anim-bell{display:block;width:100%;height:100%;transform-origin:50% 10%}
@@ -280,12 +281,12 @@ th.col-removable:hover .col-del-x{opacity:1}
 
 /* Phone booking */
 .anim-phone{display:block;width:100%;height:100%}
-.anim-badge{position:absolute;bottom:-2px;right:-4px;width:16px;height:16px;background:var(--success);border-radius:50%;color:#fff;padding:3px;box-sizing:border-box;transform:scale(0);box-shadow:0 0 0 2px rgba(255,255,255,.6)}
+.anim-badge{position:absolute;bottom:-2px;right:-4px;width:16px;height:16px;background:var(--success);border-radius:50%;color:#fff;padding:3px;box-sizing:border-box;transform:scale(1);box-shadow:0 0 0 2px rgba(255,255,255,.6)}
 .card-anim-ic.auto-play .anim-badge,.card:hover .anim-badge{animation:badgePop .9s cubic-bezier(.34,1.56,.64,1) 1 .3s forwards}
 @keyframes badgePop{0%{transform:scale(0) rotate(-30deg)}70%{transform:scale(1.2) rotate(6deg)}100%{transform:scale(1) rotate(0)}}
 
 /* Double check */
-.anim-tick{position:absolute;top:0;width:100%;height:100%;opacity:0}
+.anim-tick{position:absolute;top:0;width:100%;height:100%;opacity:1}
 .anim-tick1{left:-6px}
 .anim-tick2{left:6px}
 .card-anim-ic.auto-play .anim-tick1,.card:hover .anim-tick1{animation:tickIn .5s ease-out 1 forwards}
