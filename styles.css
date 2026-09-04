@@ -17,7 +17,7 @@
   --ease:cubic-bezier(.2,.7,.3,1);
 }
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%;font-family:'Inter',system-ui,sans-serif;color:var(--ink);background:var(--paper) fixed;background-image:radial-gradient(circle at 8% 0%, rgba(15,109,102,.07), transparent 32%),radial-gradient(circle at 95% 12%, rgba(201,125,42,.06), transparent 30%),radial-gradient(circle at 50% 100%, rgba(15,109,102,.05), transparent 45%);-webkit-font-smoothing:antialiased}
+html,body{margin:0;min-height:100%;font-family:'Inter',system-ui,sans-serif;color:var(--ink);background:var(--paper) fixed;background-image:radial-gradient(circle at 8% 0%, rgba(15,109,102,.14), transparent 38%),radial-gradient(circle at 100% 0%, rgba(201,125,42,.13), transparent 40%),radial-gradient(circle at 30% 100%, rgba(15,109,102,.10), transparent 50%),radial-gradient(circle at 90% 60%, rgba(201,125,42,.08), transparent 45%);-webkit-font-smoothing:antialiased}
 h1,h2,h3,.brand,.nav-item,.btn,.metric-value{font-family:'Manrope',Inter,system-ui,sans-serif}
 button,input,select,textarea{font:inherit;color:inherit}
 ::selection{background:var(--teal);color:#fff}
@@ -31,6 +31,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .sidebar{background:linear-gradient(180deg,var(--nav),var(--nav-2));color:#fff;padding:20px 14px;position:sticky;top:0;height:100vh;overflow:auto;display:flex;flex-direction:column}
 .brand{display:flex;align-items:center;gap:11px;padding:4px 8px 20px;font-weight:800;font-size:15px;letter-spacing:-.01em}
 .brand-mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#1a8a80,var(--teal));display:grid;place-items:center;font-weight:800;color:#fff;font-size:15px;box-shadow:0 4px 12px rgba(15,109,102,.4)}
+.brand-logo{object-fit:contain;background:#fff;padding:4px}
 .nav-section{font-size:11px;letter-spacing:.06em;color:#8CA39B;padding:14px 10px 6px;font-weight:600}
 .nav-item{display:flex;align-items:center;gap:11px;padding:10px 12px;margin:2px 0;border-radius:9px;color:#D7E4DF;cursor:pointer;font-weight:500;font-size:14px;transition:background .15s var(--ease),color .15s var(--ease),transform .1s var(--ease);position:relative}
 .nav-item svg,.nav-item .ic{width:17px;flex:0 0 auto;opacity:.85}
@@ -202,12 +203,7 @@ th.col-removable:hover .col-del-x{opacity:1}
 .file-upload-cell{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .file-upload-input{display:none}
 .file-upload-btn{cursor:pointer}
-
-/* ===== PDF inline preview ===== */
-.pdf-preview-wrap{display:block;width:150px;height:110px;border-radius:8px;border:1px solid var(--line);overflow:hidden;position:relative;box-shadow:var(--shadow-sm);text-decoration:none;transition:transform .15s var(--ease)}
-.pdf-preview-wrap:hover{transform:scale(1.03);box-shadow:var(--shadow)}
-.pdf-preview{width:400%;height:400%;transform:scale(.25);transform-origin:top left;pointer-events:none;border:0}
-.pdf-preview-fallback{display:none}
+.file-chip-broken{color:var(--muted);background:var(--surface-2);cursor:default}
 
 .system-status-section{margin-top:32px;padding-top:22px;border-top:1px dashed var(--line)}
 .system-status-section .section-label{font-size:11px;letter-spacing:.06em;color:var(--faint);font-weight:700;margin-bottom:10px;text-transform:uppercase}

@@ -83,7 +83,7 @@ async function loadData(){
 function shell(body){
   const [title,sub] = pages[state.current];
   return `<div class="app-shell"><aside class="sidebar">
-    <div class="brand"><div class="brand-mark">D</div>DMS Workspace</div>
+    <div class="brand"><img class="brand-mark brand-logo" src="https://dmsassistedtransport.com.au/wp-content/uploads/2025/09/logo-1.png" alt="DMS" onerror="this.outerHTML='<div class=&quot;brand-mark&quot;>D</div>'">DMS Workspace</div>
     <div class="nav-section">Operations</div>
     ${nav.map(([id,n])=>`<div class="nav-item ${id===state.current?'active':''}" data-page="${id}">${navIcons[id]}${n}</div>`).join('')}
   </aside><main class="main"><header class="topbar"><strong>DMS / Transport</strong><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button><div class="user-chip"><div class="avatar">D</div><span>DMS Workspace</span></div></div></header>
@@ -537,8 +537,7 @@ function fileExtLabel(url){
   return m ? m[1].toUpperCase() : 'FILE';
 }
 function fileLinkChip(url){
-  if(isImageUrl(url)) return `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" class="payload-thumb payload-thumb-sm" onerror="this.closest('a').outerHTML='<a class=&quot;file-chip&quot; href=&quot;${esc(url)}&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;>Image (preview unavailable) ↗</a>'"></a>`;
-  if(/\.pdf(\?|$)/i.test(url)) return `<a href="${esc(url)}" target="_blank" rel="noopener" class="pdf-preview-wrap"><embed src="${esc(url)}#toolbar=0&view=FitH" type="application/pdf" class="pdf-preview"><span class="pdf-preview-fallback">PDF preview may require sign-in — click to open</span></a>`;
+  if(isImageUrl(url)) return `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" class="payload-thumb payload-thumb-sm" onerror="this.closest('a').outerHTML='<span class=&quot;file-chip file-chip-broken&quot;>Image unavailable (login-protected)</span>'"></a>`;
   return `<a class="file-chip" href="${esc(url)}" target="_blank" rel="noopener"><span class="file-chip-ic">${fileExtLabel(url)}</span>Open file ↗</a>`;
 }
 
