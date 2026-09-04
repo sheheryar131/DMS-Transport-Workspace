@@ -83,7 +83,7 @@ async function loadData(){
 function shell(body){
   const [title,sub] = pages[state.current];
   return `<div class="app-shell"><aside class="sidebar">
-    <div class="brand"><img class="brand-mark brand-logo" src="https://dmsassistedtransport.com.au/wp-content/uploads/2025/09/logo-1.png" alt="DMS" onerror="this.outerHTML='<div class=&quot;brand-mark&quot;>D</div>'">DMS Workspace</div>
+    <div class="brand"><img class="brand-mark brand-logo" src="https://dmsassistedtransport.com.au/wp-content/uploads/2025/09/favicon-300x300.jpg" alt="DMS" onerror="this.outerHTML='<div class=&quot;brand-mark&quot;>D</div>'">DMS Workspace</div>
     <div class="nav-section">Operations</div>
     ${nav.map(([id,n])=>`<div class="nav-item ${id===state.current?'active':''}" data-page="${id}">${navIcons[id]}${n}</div>`).join('')}
   </aside><main class="main"><header class="topbar"><strong>DMS / Transport</strong><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button><div class="user-chip"><div class="avatar">D</div><span>DMS Workspace</span></div></div></header>
@@ -538,8 +538,73 @@ function fileExtLabel(url){
 }
 function fileLinkChip(url){
   if(isImageUrl(url)) return `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" class="payload-thumb payload-thumb-sm" onerror="this.closest('a').outerHTML='<span class=&quot;file-chip file-chip-broken&quot;>Image unavailable (login-protected)</span>'"></a>`;
+  if(/\.pdf(\?|$)/i.test(url)) return pdfPreviewHtml(url);
   return `<a class="file-chip" href="${esc(url)}" target="_blank" rel="noopener"><span class="file-chip-ic">${fileExtLabel(url)}</span>Open file ↗</a>`;
 }
+
+/* Safe PDF thumbnail: fetches bytes via JS fetch() and renders page 1 to a canvas with pdf.js.
+   Never navigates the browser to the raw URL, so it cannot trigger a forced download
+   the way <embed>/<iframe> did. Falls back to a plain "Open file" chip if the fetch/CORS/render fails. */
+const pdfThumbState = new Map(); // url -> 'pending' | 'done' | 'failed'
+let pdfjsLibPromise = null;
+function loadPdfJs(){
+  if(!pdfjsLibPromise){
+    pdfjsLibPromise = import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.min.mjs').then(lib=>{
+      lib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.min.mjs';
+      return lib;
+    });
+  }
+  return pdfjsLibPromise;
+}
+function pdfPreviewHtml(url){
+  const cid = 'pdfth_'+Math.random().toString(36).slice(2);
+  return `<span class="pdf-thumb-wrap" data-pdf-url="${esc(url)}" data-pdf-cid="${cid}">
+    <a class="file-chip pdf-chip-fallback" href="${esc(url)}" target="_blank" rel="noopener"><span class="file-chip-ic">PDF</span>Open file ↗</a>
+    <a href="${esc(url)}" target="_blank" rel="noopener" class="pdf-canvas-link" hidden><canvas id="${cid}" class="pdf-thumb-canvas"></canvas></a>
+  </span>`;
+}
+async function processPdfThumbs(){
+  const wraps = document.querySelectorAll('[data-pdf-url]');
+  for(const wrap of wraps){
+    const url = wrap.dataset.pdfUrl;
+    const cached = pdfThumbState.get(url);
+    if(cached==='failed') continue;
+    if(cached==='done'){ paintCachedThumb(wrap,url); continue; }
+    if(cached==='pending') continue;
+    pdfThumbState.set(url,'pending');
+    renderOnePdfThumb(wrap,url);
+  }
+}
+const pdfThumbDataUrls = new Map();
+function paintCachedThumb(wrap,url){
+  const dataUrl = pdfThumbDataUrls.get(url); if(!dataUrl) return;
+  const canvasLink = wrap.querySelector('.pdf-canvas-link'); const fallback = wrap.querySelector('.pdf-chip-fallback');
+  const img = new Image(); img.className='pdf-thumb-canvas'; img.src=dataUrl;
+  canvasLink.innerHTML=''; canvasLink.appendChild(img); canvasLink.hidden=false; fallback.hidden=true;
+}
+async function renderOnePdfThumb(wrap,url){
+  try{
+    const lib = await loadPdfJs();
+    const res = await fetch(url); if(!res.ok) throw new Error('fetch failed');
+    const buf = await res.arrayBuffer();
+    const pdf = await lib.getDocument({data:buf}).promise;
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({scale:1});
+    const scale = 130/viewport.width;
+    const scaledViewport = page.getViewport({scale});
+    const canvas = document.createElement('canvas');
+    canvas.width = scaledViewport.width; canvas.height = scaledViewport.height;
+    const ctx = canvas.getContext('2d');
+    await page.render({canvasContext:ctx, viewport:scaledViewport}).promise;
+    const dataUrl = canvas.toDataURL('image/png');
+    pdfThumbDataUrls.set(url,dataUrl);
+    pdfThumbState.set(url,'done');
+    document.querySelectorAll(`[data-pdf-url="${CSS.escape(url)}"]`).forEach(w=>paintCachedThumb(w,url));
+  }catch(e){
+    pdfThumbState.set(url,'failed');
+  }
+}
+
 
 /* File upload / replace — uploads to Supabase Storage 'documents' bucket, updates the row's URL column */
 function eFileUpload(table,stateKey,id,key,currentUrl){
@@ -702,6 +767,7 @@ function render(){
   document.querySelector('#showLessBookings')?.addEventListener('click',()=>{state.bookingsShowAll=false;render();});
   document.querySelectorAll('[data-eupload-table]').forEach(el=>el.onchange=()=>handleFileUpload(el));
   wireGenericTable();
+  processPdfThumbs();
 }
 
 loadData();

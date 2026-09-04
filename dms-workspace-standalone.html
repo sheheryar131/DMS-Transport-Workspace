@@ -12,15 +12,15 @@
 /* ===== DMS Transport Workspace — Design System ===== */
 :root{
   --ink:#1B2430; --ink-soft:#4A5468; --muted:#7C8598; --faint:#A7AEBD;
-  --paper:#F6F5F1; --surface:#FFFFFF; --surface-2:#FBFAF7;
-  --line:#E7E4DC; --line-soft:#F0EEE8;
-  --teal:#0F6D66; --teal-dark:#0B5450; --teal-tint:#E4F1EF;
+  --paper:#F2F5FB; --surface:#FFFFFF; --surface-2:#F7F9FD;
+  --line:#DCE3F0; --line-soft:#EBF0F9;
+  --teal:#1E4E9C; --teal-dark:#153A75; --teal-tint:#E7EEFA;
   --ochre:#C97D2A; --ochre-tint:#FBEDDD;
   --success:#1F8A5F; --success-tint:#E4F5EC;
   --warning:#B8791F; --warning-tint:#FCF1DE;
   --danger:#C6414B; --danger-tint:#FBE7E8;
   --info:#2E6E8E; --info-tint:#E7F1F5;
-  --nav:#16241F; --nav-2:#1E332C; --nav-line:rgba(255,255,255,.08);
+  --nav:#0F2544; --nav-2:#173463; --nav-line:rgba(255,255,255,.08);
   --radius-sm:8px; --radius:12px; --radius-lg:18px;
   --shadow-sm:0 1px 2px rgba(20,25,20,.06);
   --shadow:0 6px 20px rgba(20,30,25,.08);
@@ -28,7 +28,7 @@
   --ease:cubic-bezier(.2,.7,.3,1);
 }
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%;font-family:'Inter',system-ui,sans-serif;color:var(--ink);background:var(--paper) fixed;background-image:radial-gradient(circle at 8% 0%, rgba(15,109,102,.14), transparent 38%),radial-gradient(circle at 100% 0%, rgba(201,125,42,.13), transparent 40%),radial-gradient(circle at 30% 100%, rgba(15,109,102,.10), transparent 50%),radial-gradient(circle at 90% 60%, rgba(201,125,42,.08), transparent 45%);-webkit-font-smoothing:antialiased}
+html,body{margin:0;min-height:100%;font-family:'Inter',system-ui,sans-serif;color:var(--ink);background:var(--paper) fixed;background-image:radial-gradient(circle at 8% 0%, rgba(30,78,156,.16), transparent 40%),radial-gradient(circle at 100% 0%, rgba(91,155,213,.16), transparent 42%),radial-gradient(circle at 30% 100%, rgba(30,78,156,.12), transparent 55%),radial-gradient(circle at 90% 65%, rgba(91,155,213,.10), transparent 48%);-webkit-font-smoothing:antialiased}
 h1,h2,h3,.brand,.nav-item,.btn,.metric-value{font-family:'Manrope',Inter,system-ui,sans-serif}
 button,input,select,textarea{font:inherit;color:inherit}
 ::selection{background:var(--teal);color:#fff}
@@ -41,8 +41,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .app-shell{display:grid;grid-template-columns:252px 1fr;min-height:100vh}
 .sidebar{background:linear-gradient(180deg,var(--nav),var(--nav-2));color:#fff;padding:20px 14px;position:sticky;top:0;height:100vh;overflow:auto;display:flex;flex-direction:column}
 .brand{display:flex;align-items:center;gap:11px;padding:4px 8px 20px;font-weight:800;font-size:15px;letter-spacing:-.01em}
-.brand-mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#1a8a80,var(--teal));display:grid;place-items:center;font-weight:800;color:#fff;font-size:15px;box-shadow:0 4px 12px rgba(15,109,102,.4)}
-.brand-logo{object-fit:contain;background:#fff;padding:4px}
+.brand-mark{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#2C5FAE,var(--teal));display:grid;place-items:center;font-weight:800;color:#fff;font-size:16px;box-shadow:0 4px 14px rgba(30,78,156,.45)}
+.brand-logo{object-fit:cover;background:#fff;padding:0;border:2px solid rgba(255,255,255,.9);box-shadow:0 4px 14px rgba(0,0,0,.35)}
 .nav-section{font-size:11px;letter-spacing:.06em;color:#8CA39B;padding:14px 10px 6px;font-weight:600}
 .nav-item{display:flex;align-items:center;gap:11px;padding:10px 12px;margin:2px 0;border-radius:9px;color:#D7E4DF;cursor:pointer;font-weight:500;font-size:14px;transition:background .15s var(--ease),color .15s var(--ease),transform .1s var(--ease);position:relative}
 .nav-item svg,.nav-item .ic{width:17px;flex:0 0 auto;opacity:.85}
@@ -215,6 +215,10 @@ th.col-removable:hover .col-del-x{opacity:1}
 .file-upload-input{display:none}
 .file-upload-btn{cursor:pointer}
 .file-chip-broken{color:var(--muted);background:var(--surface-2);cursor:default}
+.pdf-thumb-wrap{display:inline-block}
+.pdf-canvas-link{display:block;width:fit-content}
+.pdf-thumb-canvas{max-width:130px;border-radius:8px;border:1px solid var(--line);box-shadow:var(--shadow-sm);display:block;transition:transform .15s var(--ease)}
+.pdf-canvas-link:hover .pdf-thumb-canvas{transform:scale(1.04);box-shadow:var(--shadow)}
 
 .system-status-section{margin-top:32px;padding-top:22px;border-top:1px dashed var(--line)}
 .system-status-section .section-label{font-size:11px;letter-spacing:.06em;color:var(--faint);font-weight:700;margin-bottom:10px;text-transform:uppercase}
@@ -316,7 +320,7 @@ async function loadData(){
 function shell(body){
   const [title,sub] = pages[state.current];
   return `<div class="app-shell"><aside class="sidebar">
-    <div class="brand"><img class="brand-mark brand-logo" src="https://dmsassistedtransport.com.au/wp-content/uploads/2025/09/logo-1.png" alt="DMS" onerror="this.outerHTML='<div class=&quot;brand-mark&quot;>D</div>'">DMS Workspace</div>
+    <div class="brand"><img class="brand-mark brand-logo" src="https://dmsassistedtransport.com.au/wp-content/uploads/2025/09/favicon-300x300.jpg" alt="DMS" onerror="this.outerHTML='<div class=&quot;brand-mark&quot;>D</div>'">DMS Workspace</div>
     <div class="nav-section">Operations</div>
     ${nav.map(([id,n])=>`<div class="nav-item ${id===state.current?'active':''}" data-page="${id}">${navIcons[id]}${n}</div>`).join('')}
   </aside><main class="main"><header class="topbar"><strong>DMS / Transport</strong><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button><div class="user-chip"><div class="avatar">D</div><span>DMS Workspace</span></div></div></header>
@@ -771,8 +775,73 @@ function fileExtLabel(url){
 }
 function fileLinkChip(url){
   if(isImageUrl(url)) return `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" class="payload-thumb payload-thumb-sm" onerror="this.closest('a').outerHTML='<span class=&quot;file-chip file-chip-broken&quot;>Image unavailable (login-protected)</span>'"></a>`;
+  if(/\.pdf(\?|$)/i.test(url)) return pdfPreviewHtml(url);
   return `<a class="file-chip" href="${esc(url)}" target="_blank" rel="noopener"><span class="file-chip-ic">${fileExtLabel(url)}</span>Open file ↗</a>`;
 }
+
+/* Safe PDF thumbnail: fetches bytes via JS fetch() and renders page 1 to a canvas with pdf.js.
+   Never navigates the browser to the raw URL, so it cannot trigger a forced download
+   the way <embed>/<iframe> did. Falls back to a plain "Open file" chip if the fetch/CORS/render fails. */
+const pdfThumbState = new Map(); // url -> 'pending' | 'done' | 'failed'
+let pdfjsLibPromise = null;
+function loadPdfJs(){
+  if(!pdfjsLibPromise){
+    pdfjsLibPromise = import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.min.mjs').then(lib=>{
+      lib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.min.mjs';
+      return lib;
+    });
+  }
+  return pdfjsLibPromise;
+}
+function pdfPreviewHtml(url){
+  const cid = 'pdfth_'+Math.random().toString(36).slice(2);
+  return `<span class="pdf-thumb-wrap" data-pdf-url="${esc(url)}" data-pdf-cid="${cid}">
+    <a class="file-chip pdf-chip-fallback" href="${esc(url)}" target="_blank" rel="noopener"><span class="file-chip-ic">PDF</span>Open file ↗</a>
+    <a href="${esc(url)}" target="_blank" rel="noopener" class="pdf-canvas-link" hidden><canvas id="${cid}" class="pdf-thumb-canvas"></canvas></a>
+  </span>`;
+}
+async function processPdfThumbs(){
+  const wraps = document.querySelectorAll('[data-pdf-url]');
+  for(const wrap of wraps){
+    const url = wrap.dataset.pdfUrl;
+    const cached = pdfThumbState.get(url);
+    if(cached==='failed') continue;
+    if(cached==='done'){ paintCachedThumb(wrap,url); continue; }
+    if(cached==='pending') continue;
+    pdfThumbState.set(url,'pending');
+    renderOnePdfThumb(wrap,url);
+  }
+}
+const pdfThumbDataUrls = new Map();
+function paintCachedThumb(wrap,url){
+  const dataUrl = pdfThumbDataUrls.get(url); if(!dataUrl) return;
+  const canvasLink = wrap.querySelector('.pdf-canvas-link'); const fallback = wrap.querySelector('.pdf-chip-fallback');
+  const img = new Image(); img.className='pdf-thumb-canvas'; img.src=dataUrl;
+  canvasLink.innerHTML=''; canvasLink.appendChild(img); canvasLink.hidden=false; fallback.hidden=true;
+}
+async function renderOnePdfThumb(wrap,url){
+  try{
+    const lib = await loadPdfJs();
+    const res = await fetch(url); if(!res.ok) throw new Error('fetch failed');
+    const buf = await res.arrayBuffer();
+    const pdf = await lib.getDocument({data:buf}).promise;
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({scale:1});
+    const scale = 130/viewport.width;
+    const scaledViewport = page.getViewport({scale});
+    const canvas = document.createElement('canvas');
+    canvas.width = scaledViewport.width; canvas.height = scaledViewport.height;
+    const ctx = canvas.getContext('2d');
+    await page.render({canvasContext:ctx, viewport:scaledViewport}).promise;
+    const dataUrl = canvas.toDataURL('image/png');
+    pdfThumbDataUrls.set(url,dataUrl);
+    pdfThumbState.set(url,'done');
+    document.querySelectorAll(`[data-pdf-url="${CSS.escape(url)}"]`).forEach(w=>paintCachedThumb(w,url));
+  }catch(e){
+    pdfThumbState.set(url,'failed');
+  }
+}
+
 
 /* File upload / replace — uploads to Supabase Storage 'documents' bucket, updates the row's URL column */
 function eFileUpload(table,stateKey,id,key,currentUrl){
@@ -935,6 +1004,7 @@ function render(){
   document.querySelector('#showLessBookings')?.addEventListener('click',()=>{state.bookingsShowAll=false;render();});
   document.querySelectorAll('[data-eupload-table]').forEach(el=>el.onchange=()=>handleFileUpload(el));
   wireGenericTable();
+  processPdfThumbs();
 }
 
 loadData();
