@@ -182,7 +182,19 @@ th.col-removable:hover .col-del-x{opacity:1}
 .link-btn{border:0;background:none;color:var(--teal);font-weight:700;font-size:13px;cursor:pointer;padding:6px 10px;border-radius:7px;transition:background .15s}
 .link-btn:hover{background:var(--teal-tint)}
 
-/* ===== System status (secondary section) ===== */
+/* ===== Payload thumbnails / file chips ===== */
+.payload-thumb{max-width:220px;max-height:160px;border-radius:8px;border:1px solid var(--line);object-fit:cover;display:block;box-shadow:var(--shadow-sm);transition:transform .15s var(--ease)}
+.payload-thumb:hover{transform:scale(1.03)}
+.payload-thumb-sm{max-width:70px;max-height:50px}
+.file-chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:6px 11px 6px 8px;font-size:12.5px;font-weight:600;color:var(--teal);text-decoration:none;transition:all .15s var(--ease)}
+.file-chip:hover{border-color:var(--teal);box-shadow:var(--shadow-sm);transform:translateY(-1px)}
+.file-chip-ic{background:var(--teal);color:#fff;border-radius:5px;padding:2px 6px;font-size:9.5px;font-weight:800;letter-spacing:.02em}
+.muted{color:var(--faint)}
+
+/* ===== Fleet group headers ===== */
+.group-row td{background:linear-gradient(90deg,var(--teal-tint),transparent);border-top:2px solid var(--teal);padding-top:12px}
+.group-row{position:sticky;top:38px}
+
 .system-status-section{margin-top:32px;padding-top:22px;border-top:1px dashed var(--line)}
 .system-status-section .section-label{font-size:11px;letter-spacing:.06em;color:var(--faint);font-weight:700;margin-bottom:10px;text-transform:uppercase}
 

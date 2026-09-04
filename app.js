@@ -377,10 +377,10 @@ function astpPage(){
     addDefaults:undefined,
     cols:[
       {label:'Staff member', render:(r)=>`<strong>${esc(personName(r.staff_id))}</strong>`},
-      {label:'Driver Application', render:r=>r.driver_application_url?`<a href="${esc(r.driver_application_url)}" target="_blank" rel="noopener">✓ File</a>`:'—'},
-      {label:'Medical Fitness', render:r=>r.medical_fitness_url?`<a href="${esc(r.medical_fitness_url)}" target="_blank" rel="noopener">✓ File</a>`:'—'},
-      {label:'WWCC', render:r=>r.wwc_url?`<a href="${esc(r.wwc_url)}" target="_blank" rel="noopener">✓ File</a>`:'—'},
-      {label:'Licence', render:r=>r.drivers_licence_url?`<a href="${esc(r.drivers_licence_url)}" target="_blank" rel="noopener">✓ File</a>`:'—'},
+      {label:'Driver Application', render:r=>r.driver_application_url?fileLinkChip(r.driver_application_url):'—'},
+      {label:'Medical Fitness', render:r=>r.medical_fitness_url?fileLinkChip(r.medical_fitness_url):'—'},
+      {label:'WWCC', render:r=>r.wwc_url?fileLinkChip(r.wwc_url):'—'},
+      {label:'Licence', render:r=>r.drivers_licence_url?fileLinkChip(r.drivers_licence_url):'—'},
       {label:'Notes', render:(r,e)=>e?eText('astp_compliance','astp',r.id,'notes',r.notes):esc(r.notes||'—')},
     ]
   });
@@ -445,7 +445,7 @@ function fleetPage(){
       <td>${editing?eText('vehicles','vehicles',v.id,'rego_expiry',v.rego_expiry,{type:'date'}):fmtDate(v.rego_expiry)}</td>
       <td>${editing?eText('vehicles','vehicles',v.id,'hvis_expiry',v.hvis_expiry,{type:'date'}):fmtDate(v.hvis_expiry)}</td>
       <td>${editing?eSelect('vehicles','vehicles',v.id,'astp_usage',v.astp_usage,VEHICLE_ASTP_OPTS):esc(v.astp_usage||'—')}</td>
-      <td>${v.application_pack_url?`<a href="${esc(v.application_pack_url)}" target="_blank" rel="noopener">File ↗</a>`:(editing?eText('vehicles','vehicles',v.id,'application_pack_url',''):'—')}</td>
+      <td>${v.application_pack_url?fileLinkChip(v.application_pack_url):(editing?eText('vehicles','vehicles',v.id,'application_pack_url',''):'—')}</td>
       <td>${editing?eSelect('vehicles','vehicles',v.id,'emergency_equipment_label',v.emergency_equipment==null?'':(v.emergency_equipment?'YES':'NO'),VEHICLE_YN_OPTS,{cast:'bool-yn'}):badge(v.emergency_equipment==null?'—':(v.emergency_equipment?'YES':'NO'))}</td>
       <td>${editing?eSelect('vehicles','vehicles',v.id,'epi_pen_label',v.epi_pen==null?'':(v.epi_pen?'YES':'NO'),VEHICLE_YN_OPTS,{cast:'bool-yn'}):badge(v.epi_pen==null?'—':(v.epi_pen?'YES':'NO'))}</td>
       <td>${editing?eSelect('vehicles','vehicles',v.id,'warning_signage_label',v.warning_signage==null?'':(v.warning_signage?'YES':'NO'),VEHICLE_YN_OPTS,{cast:'bool-yn'}):badge(v.warning_signage==null?'—':(v.warning_signage?'YES':'NO'))}</td>
@@ -465,7 +465,76 @@ function fleetPage(){
   </div>`;
 }
 
-/* ===================== Compliance issue detection (ported from legacy compliance.js) ===================== */
+/* ===================== Payload display formatting ===================== */
+
+const FIELD_LABELS = {
+  q4_typeA:'Vehicle Registration', q5_date:'Date', q40_number:'Odometer', q42_uniqueId:'Unique ID',
+  q54_fatigueManagement:'Fatigue Management', q55_emotionalWellbeing:'Emotional Wellbeing',
+  q56_tripPlanning:'Trip Planning', q57_medicationAnd:'Medication and Substances',
+  q58_emergencyAnd:'Emergency and Safety', q62_brakesAnd:'Brakes and Brake Lights',
+  q63_tyreCondition63:'Tyres', q64_headlights64:'Headlights', q65_indicators65:'Indicators',
+  q66_headlights66:'Windscreen', q67_headlights67:'Wipers - Front and Back',
+  q68_headlights68:'Mirrors - Internal/External', q69_headlights69:'Fuel',
+  q71_anyAdditional:'Additional Comments', q85_confirmItems85:'Stock Check',
+  q86_driverName:'Driver Name', q87_driverName:'Driver Name', q86_vehicleClean:'Vehicle Clean and in Good Condition',
+  q90_uploadA:'Vehicle Log Book Photo', q30_signature:'Signature', q12_driversSignature:'Driver Signature',
+  q10_signature:'Signature', q9_vehicleUsed:'Vehicle Used', q38_driverName:'Driver Name',
+  q43_typeA:'Passenger Name', q25_typeA25:'Booking ID', q48_typeA48:'Date of Collection',
+  q44_pickupLocation:'Pickup Location', q46_dropoffLocation:'Drop-off Location', q49_timeOf:'Time of Collection',
+  q50_returnRequired:'Return Booked', q51_waitTime:'Wait Time', q47_anyAdditional:'Additional Notes',
+  q28_whatAre:'What Are You Reporting', q42_descriptionOf:'Description', q70_address:'Location',
+  q49_staffName:'Staff Name', q69_participantsName:'Participant Name', q34_phoneNumber:'Phone Number',
+  q60_typeA:'Full Name', q63_typeA63:'SIL Location', q99_trainer:'Trainer', q67_supportWorker:'Support Worker',
+  q122_additionalNotes:'Additional Notes', q57_stock:'First Aid Stock Used',
+};
+const SYSTEM_KEYS = new Set(['path','slug','event_id','buildDate','submitDate','submitSource','timeToSubmit',
+  'uploadServerUrl','newCardFormMobile','jsExecutionTracker','validatedNewRequiredFieldIDs','file','file_server',
+  'temp_upload','eventObserver','eventObserverPayment','hiddenPaymentField','payment_version','payment_discount_value',
+  'payment_total_checksum','payment_transaction_uuid','paymentSummary','visitedPages']);
+
+function fieldLabel(key){
+  return FIELD_LABELS[key] || key.replace(/^q\d+_?/,'').replace(/([A-Z])/g,' $1').replace(/\s+/g,' ').trim().replace(/^./,c=>c.toUpperCase()) || key;
+}
+function isImageUrl(s){ return typeof s==='string' && (s.startsWith('data:image') || /\.(png|jpe?g|gif|webp)(\?|$)/i.test(s)); }
+function isFileUrl(s){ return typeof s==='string' && /^https?:\/\//i.test(s); }
+function formatDateObj(v){
+  if(v && typeof v==='object' && (v.day||v.month||v.year)){
+    const d=v.day?String(v.day).padStart(2,'0'):'', m=v.month?String(v.month).padStart(2,'0'):'', y=v.year||'';
+    return [d,m,y].filter(Boolean).join('/');
+  }
+  return null;
+}
+function renderPayloadValue(key,v){
+  if(v==null || v==='') return '<span class="muted">—</span>';
+  const dateStr = formatDateObj(v);
+  if(dateStr) return esc(dateStr);
+  if(isImageUrl(v)) return `<a href="${esc(v)}" target="_blank" rel="noopener"><img src="${esc(v)}" alt="${esc(fieldLabel(key))}" class="payload-thumb"></a>`;
+  if(Array.isArray(v)){
+    const imgs = v.filter(isImageUrl);
+    if(imgs.length) return imgs.map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="${esc(fieldLabel(key))}" class="payload-thumb"></a>`).join(' ');
+    return esc(v.filter(Boolean).join(', ')) || '<span class="muted">—</span>';
+  }
+  if(typeof v==='object'){
+    const vals = Object.entries(v).filter(([k])=>k!=='other').map(([,x])=>x);
+    const other = v.other;
+    const flat = [...vals, other].filter(x=>x!=null && x!=='');
+    if(flat.some(isImageUrl)) return flat.filter(isImageUrl).map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="${esc(fieldLabel(key))}" class="payload-thumb"></a>`).join(' ');
+    return esc(flat.map(String).join(', ')) || '<span class="muted">—</span>';
+  }
+  if(isImageUrl(v)) return `<img src="${esc(v)}" class="payload-thumb">`;
+  if(isFileUrl(v)) return fileLinkChip(v);
+  return esc(String(v));
+}
+function fileExtLabel(url){
+  const m = String(url).match(/\.([a-z0-9]{2,5})(?:\?|$)/i);
+  return m ? m[1].toUpperCase() : 'FILE';
+}
+function fileLinkChip(url){
+  if(isImageUrl(url)) return `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" class="payload-thumb payload-thumb-sm"></a>`;
+  return `<a class="file-chip" href="${esc(url)}" target="_blank" rel="noopener"><span class="file-chip-ic">${fileExtLabel(url)}</span>Open file ↗</a>`;
+}
+
+
 
 const NEGATIVE = /(missing|not working|fail|failed|fault|broken|damage|damaged|unsafe|defect|issue|problem|low|empty|expired|unavailable|not available|needs? repair)/i;
 const EXPECTED_STOCK = ['gloves','surgical masks','sanitiser','cleaning supplies'];
@@ -516,8 +585,8 @@ function genericDetailModal(table,id){
     const issues=checkIssues(row);
     return issues.length?`<div class="issue-summary"><strong>⚠ ${issues.length} compliance issue${issues.length===1?'':'s'} found</strong>${issues.map(i=>`<div><b>${esc(i.label)}:</b> ${esc(i.message)}</div>`).join('')}</div>`:(Object.keys(p).length?'<div class="pass-summary"><strong>✓ No compliance issues detected</strong></div>':'');
   })() : '';
-  const rows=Object.keys(p).filter(k=>!['path','slug','event_id','buildDate','submitDate','submitSource','timeToSubmit','uploadServerUrl','newCardFormMobile','jsExecutionTracker','validatedNewRequiredFieldIDs'].includes(k))
-    .map(k=>`<div class="answer-row"><div class="answer-label">${esc(k.replace(/^q\d+_?/,'').replace(/([A-Z])/g,' $1').trim()||k)}</div><div class="answer-value">${esc(typeof p[k]==='object'?JSON.stringify(p[k]):String(p[k]??'—'))}</div></div>`).join('')||'<div class="empty">No detailed submission payload stored for this record.</div>';
+  const rows=Object.keys(p).filter(k=>!SYSTEM_KEYS.has(k))
+    .map(k=>`<div class="answer-row"><div class="answer-label">${esc(fieldLabel(k))}</div><div class="answer-value">${renderPayloadValue(k,p[k])}</div></div>`).join('')||'<div class="empty">No detailed submission payload stored for this record.</div>';
   document.body.insertAdjacentHTML('beforeend',`<div class="compliance-modal-backdrop" id="genericDetailModal"><div class="compliance-modal"><div class="compliance-head"><div><h3>${titles[table]||'Submission'}</h3></div><button id="closeGenericDetail">×</button></div><div class="compliance-body">${issueSummary}<div class="answers-title">Complete submission</div>${rows}</div></div></div>`);
   const close=()=>document.querySelector('#genericDetailModal')?.remove();
   document.querySelector('#closeGenericDetail').onclick=close;
