@@ -94,7 +94,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .panel-body{padding:18px 20px}
 
 /* ===== Tables ===== */
-.table-wrap{overflow:auto}
+.table-wrap{overflow:auto;resize:vertical;min-height:120px;max-height:80vh;border-radius:0 0 var(--radius) var(--radius)}
+.table-wrap::-webkit-resizer{background:linear-gradient(135deg,transparent 0 40%,var(--teal) 40% 55%,transparent 55% 60%,var(--teal) 60% 75%,transparent 75%)}
 .table{width:100%;border-collapse:collapse;font-size:13.5px}
 .table th{text-align:left;padding:10px 10px;background:var(--surface-2);color:var(--muted);font-weight:700;font-size:11.5px;letter-spacing:.02em;border-bottom:1px solid var(--line);white-space:normal;position:sticky;top:0;line-height:1.3}
 .table td{padding:8px 10px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
@@ -292,3 +293,8 @@ th.col-removable:hover .col-del-x{opacity:1}
 .card-anim-ic.auto-play .anim-tick1,.card:hover .anim-tick1{animation:tickIn .5s ease-out 1 forwards}
 .card-anim-ic.auto-play .anim-tick2,.card:hover .anim-tick2{animation:tickIn .5s ease-out 1 .22s forwards}
 @keyframes tickIn{0%{opacity:0;transform:translateX(-8px) scale(.6)}100%{opacity:1;transform:translateX(0) scale(1)}}
+
+/* ===== Column drag-to-reorder ===== */
+.table th[draggable="true"]{cursor:grab}
+.table th[draggable="true"]:active{cursor:grabbing}
+.table th.col-dragging{opacity:.4}

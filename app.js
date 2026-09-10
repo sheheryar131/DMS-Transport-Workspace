@@ -212,6 +212,21 @@ function unpopField(el){
   el.style.left=''; el.style.top=''; el.style.width='';
 }
 
+function restorePanelSizes(){
+  document.querySelectorAll('[data-resize-key]').forEach(el=>{
+    const key = 'panelHeight:'+el.dataset.resizeKey;
+    const saved = localStorage.getItem(key);
+    if(saved) el.style.height = saved+'px';
+    if(!el._resizeObserved){
+      el._resizeObserved = true;
+      const ro = new ResizeObserver(()=>{
+        localStorage.setItem(key, Math.round(el.getBoundingClientRect().height));
+      });
+      ro.observe(el);
+    }
+  });
+}
+
 function wireGenericTable(){
   document.querySelectorAll('[data-etable]').forEach(el=>{
     el.onchange=()=>genericFieldChange(el);
@@ -288,7 +303,7 @@ function dashboard(){
   </div>
   <div class="grid-2">
     <div class="panel"><div class="panel-head"><h3>Recent bookings</h3></div>
-      ${recentRows.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>Booking</th><th>Passenger</th><th>Date</th><th>Driver</th><th>Status</th></tr></thead><tbody>${recentRows.map(b=>`<tr class="${rowStatusClass(b.status)}"><td><strong>${esc(b.booking_code)}</strong></td><td>${esc(b.passenger_name||'—')}</td><td>${fmtDate(b.booking_date)}</td><td>${esc(personName(b.driver_id))}</td><td>${badge(b.status)}</td></tr>`).join('')}${remaining>0?`<tr class="show-more-row"><td colspan="5"><button class="link-btn" id="showMoreBookings">Show ${remaining} more →</button></td></tr>`:(state.bookingsShowAll && state.bookings.length>3?`<tr class="show-more-row"><td colspan="5"><button class="link-btn" id="showLessBookings">Show less</button></td></tr>`:'')}</tbody></table></div>` : '<div class="empty">No bookings yet.</div>'}
+      ${recentRows.length ? `<div class="table-wrap" data-resize-key="dashboard-bookings"><table class="table"><thead><tr><th>Booking</th><th>Passenger</th><th>Date</th><th>Driver</th><th>Status</th></tr></thead><tbody>${recentRows.map(b=>`<tr class="${rowStatusClass(b.status)}"><td><strong>${esc(b.booking_code)}</strong></td><td>${esc(b.passenger_name||'—')}</td><td>${fmtDate(b.booking_date)}</td><td>${esc(personName(b.driver_id))}</td><td>${badge(b.status)}</td></tr>`).join('')}${remaining>0?`<tr class="show-more-row"><td colspan="5"><button class="link-btn" id="showMoreBookings">Show ${remaining} more →</button></td></tr>`:(state.bookingsShowAll && state.bookings.length>3?`<tr class="show-more-row"><td colspan="5"><button class="link-btn" id="showLessBookings">Show less</button></td></tr>`:'')}</tbody></table></div>` : '<div class="empty">No bookings yet.</div>'}
     </div>
     <div class="panel"><div class="panel-head"><h3>Fleet &amp; Compliance Snapshot</h3></div><div class="panel-body">
       ${expiringVehicles.length ? expiringVehicles.map(v=>`<div class="connection"><strong>${esc(v.rego)}</strong><span class="${v.days<=7?'warn':''}" style="${v.days<=7?'':'color:var(--muted)'}">${esc(v.label)} in ${v.days}d (${fmtDate(v.date)})</span></div>`).join('') : '<div class="connection"><strong>No expiries due soon</strong><span class="ok">All clear</span></div>'}
@@ -310,7 +325,7 @@ function bookingsPage(){
   const cols = ['Booking','Passenger','Date / Time','Pickup','Drop-off','Driver','Vehicle','Funding','Status',...extraKeys];
   return `<div class="panel ${editing?'editing-mode':''}">
     <div class="panel-head"><h3>Master Bookings</h3><div class="col-actions">${editing?`<button class="col-add-btn" data-add-field="bookings|bookings">+ Field</button>`:''}${editToggle('bookings')}</div></div>
-    <div class="table-wrap"><table class="table"><thead><tr>${cols.map(c=>{
+    <div class="table-wrap" data-resize-key="bookings"><table class="table"><thead><tr>${cols.map(c=>{
       const isExtra = extraKeys.includes(c);
       return isExtra && editing ? `<th class="col-removable">${esc(c)}<button class="col-del-x" data-del-field="bookings|bookings|${esc(c)}">×</button></th>` : `<th>${esc(c)}</th>`;
     }).join('')}${editing?'<th></th>':''}</tr></thead><tbody>
@@ -338,25 +353,66 @@ function newBookingModal(){
 
 /* ===================== Generic simple editable page builder (for Checks/Transfers/Incidents/Stock/Staff/ASTP) ===================== */
 
+function getColumnOrder(key, labels){
+  let stored=[]; try{ stored = JSON.parse(localStorage.getItem('colOrder:'+key)||'[]'); }catch{}
+  const known = new Set(labels);
+  const ordered = stored.filter(l=>known.has(l));
+  const missing = labels.filter(l=>!ordered.includes(l));
+  return [...ordered, ...missing];
+}
+function saveColumnOrder(key, labels){
+  localStorage.setItem('colOrder:'+key, JSON.stringify(labels));
+}
+let dragColState = null;
+function wireColumnDrag(){
+  document.querySelectorAll('th[data-col-label]').forEach(th=>{
+    th.ondragstart = e=>{ dragColState = {key: th.dataset.colKey, label: th.dataset.colLabel}; e.dataTransfer.effectAllowed='move'; th.classList.add('col-dragging'); };
+    th.ondragend = ()=>th.classList.remove('col-dragging');
+    th.ondragover = e=>{ e.preventDefault(); };
+    th.ondrop = e=>{
+      e.preventDefault();
+      if(!dragColState || dragColState.key !== th.dataset.colKey) return;
+      const targetLabel = th.dataset.colLabel;
+      if(targetLabel===dragColState.label) return;
+      const allLabels = [...document.querySelectorAll(`th[data-col-key="${CSS.escape(th.dataset.colKey)}"]`)].map(x=>x.dataset.colLabel);
+      const stored = getColumnOrder(th.dataset.colKey, allLabels);
+      const fromIdx = stored.indexOf(dragColState.label);
+      const toIdx = stored.indexOf(targetLabel);
+      if(fromIdx===-1||toIdx===-1) return;
+      stored.splice(fromIdx,1);
+      stored.splice(toIdx,0,dragColState.label);
+      saveColumnOrder(th.dataset.colKey, stored);
+      render();
+    };
+  });
+}
+
 function editablePage({pageKey,title,table,stateKey,cols,addDefaults,rowAttrs}){
   const rows = state[stateKey];
   const editing = !!editState[pageKey];
   const extraKeys = extraKeysOf(rows);
-  const allCols = [...cols, ...extraKeys.map(k=>({key:'__extra_'+k,label:k,extra:k}))];
+  let allCols = [...cols, ...extraKeys.map(k=>({key:'__extra_'+k,label:k,extra:k}))];
+  const order = getColumnOrder(stateKey, allCols.map(c=>c.label));
+  allCols = order.map(l=>allCols.find(c=>c.label===l)).filter(Boolean);
   return `<div class="panel ${editing?'editing-mode':''}">
     <div class="panel-head"><h3>${title}</h3><div class="col-actions">
       ${editing?`<button class="col-add-btn" data-add-field="${table}|${stateKey}">+ Field</button>`:''}
       ${editing&&addDefaults!==undefined?`<button class="btn small" data-add-row="${table}|${stateKey}" data-add-defaults='${JSON.stringify(addDefaults)}'>+ Row</button>`:''}
       ${editToggle(pageKey)}
     </div></div>
-    ${!rows.length?'<div class="empty">No records yet.</div>':`<div class="table-wrap"><table class="table"><thead><tr>${allCols.map(c=>{
-      if(c.extra && editing) return `<th class="col-removable">${esc(c.label)}<button class="col-del-x" data-del-field="${table}|${stateKey}|${esc(c.extra)}">×</button></th>`;
-      return `<th>${esc(c.label)}</th>`;
+    ${!rows.length?'<div class="empty">No records yet.</div>':`<div class="table-wrap" data-resize-key="${stateKey}"><table class="table"><thead><tr>${allCols.map(c=>{
+      const dragAttrs = `draggable="true" data-col-key="${esc(stateKey)}" data-col-label="${esc(c.label)}"`;
+      if(c.extra && editing) return `<th class="col-removable" ${dragAttrs}>${esc(c.label)}<button class="col-del-x" data-del-field="${table}|${stateKey}|${esc(c.extra)}">×</button></th>`;
+      return `<th ${dragAttrs}>${esc(c.label)}</th>`;
     }).join('')}${editing?'<th></th>':''}</tr></thead><tbody>
-    ${rows.map(r=>`<tr ${rowAttrs?rowAttrs(r,editing):''} class="${(rowAttrs&&!editing?'clickable-check ':'')+c_rowClass(r)}">${allCols.map(c=>{
-      if(c.extra) return `<td>${eExtra(table,stateKey,r.id,c.extra,(r.extra||{})[c.extra],{disabled:!editing})}</td>`;
-      return `<td>${c.render(r,editing)}</td>`;
-    }).join('')}${editing?`<td><button class="btn small danger" data-del-row="${table}|${stateKey}|${r.id}">Del</button></td>`:''}</tr>`).join('')}
+    ${rows.map(r=>{
+      const extra = rowAttrs?rowAttrs(r,editing):'';
+      const clickable = extra && !editing;
+      return `<tr ${extra} class="${clickable?'clickable-check ':''}${c_rowClass(r)}">${allCols.map(c=>{
+        if(c.extra) return `<td>${eExtra(table,stateKey,r.id,c.extra,(r.extra||{})[c.extra],{disabled:!editing})}</td>`;
+        return `<td>${c.render(r,editing)}</td>`;
+      }).join('')}${editing?`<td><button class="btn small danger" data-del-row="${table}|${stateKey}|${r.id}">Del</button></td>`:''}</tr>`;
+    }).join('')}
     </tbody></table></div>`}
   </div>`;
 }
@@ -366,7 +422,7 @@ function checksPage(){
   return editablePage({
     pageKey:'checks', title:'Daily Vehicle Checks', table:'vehicle_checks', stateKey:'checks',
     addDefaults:{check_type:'pre_start'},
-    rowAttrs:(r,editing)=>editing?'':`class="clickable-check" data-detail-table="checks" data-detail-id="${r.id}"`,
+    rowAttrs:(r,editing)=>editing?'':`data-detail-table="checks" data-detail-id="${r.id}"`,
     cols:[
       {label:'Type', render:(r,e)=>e?eSelect('vehicle_checks','checks',r.id,'check_type',r.check_type,[{value:'pre_start',label:'Pre-start'},{value:'post_shift',label:'Post-shift'}],{blank:false}):badge(r.check_type==='pre_start'?'Pre-start':'Post-shift')},
       {label:'Date', render:(r,e)=>e?eText('vehicle_checks','checks',r.id,'check_date',r.check_date,{type:'date'}):fmtDate(r.check_date)},
@@ -383,6 +439,7 @@ function transfersPage(){
   return editablePage({
     pageKey:'transfers', title:'Submitted Transfer Forms', table:'transfer_logs', stateKey:'transfers',
     addDefaults:{},
+    rowAttrs:(r,editing)=>editing?'':`data-detail-table="transfers" data-detail-id="${r.id}"`,
     cols:[
       {label:'Booking', render:(r,e)=>e?eText('transfer_logs','transfers',r.id,'booking_code',r.booking_code):`<strong>${esc(r.booking_code||'—')}</strong>`},
       {label:'Driver', render:(r,e)=>e?eText('transfer_logs','transfers',r.id,'driver_name',r.driver_name):esc(r.driver_name||'—')},
@@ -399,6 +456,7 @@ function incidentPage(){
   return editablePage({
     pageKey:'incidents', title:'Incident & Hazard Reporting', table:'incidents', stateKey:'incidents',
     addDefaults:{status:'Open'},
+    rowAttrs:(r,editing)=>editing?'':`data-detail-table="incidents" data-detail-id="${r.id}"`,
     cols:[
       {label:'Status', render:(r,e)=>e?eSelect('incidents','incidents',r.id,'status',r.status,['Open','In Review','Closed'],{blank:false}):badge(r.status)},
       {label:'Date / Time', render:(r,e)=>e?eText('incidents','incidents',r.id,'incident_at',r.incident_at?r.incident_at.slice(0,16):'',{type:'datetime-local'}):(r.incident_at?new Date(r.incident_at).toLocaleString('en-AU'):'—')},
@@ -483,7 +541,7 @@ function silPage(){
     const editing = !!editState[s.key];
     const rows = state[s.key];
     return `<div class="panel ${editing?'editing-mode':''}"><div class="panel-head"><h3>${s.title}</h3>${editToggle(s.key)}</div>
-    ${!rows.length?'<div class="empty">No records yet.</div>':`<div class="table-wrap"><table class="table"><thead><tr>${s.cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${s.cols.map(c=>`<td>${c.render(r,editing)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
+    ${!rows.length?'<div class="empty">No records yet.</div>':`<div class="table-wrap" data-resize-key="sil-${s.key}"><table class="table"><thead><tr>${s.cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr ${editing?'':`data-detail-table="${s.key}" data-detail-id="${r.id}"`} class="${editing?'':'clickable-check'}">${s.cols.map(c=>`<td>${c.render(r,editing)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
     </div>`;
   }).join('')}</div>`;
 }
@@ -533,7 +591,7 @@ function fleetPage(){
   }).join('');
   return `<div class="panel ${editing?'editing-mode':''}">
     <div class="panel-head"><h3>Fleet — Asset List</h3><div class="col-actions">${editing?`<button class="col-add-btn" data-add-field="vehicles|vehicles">+ Field</button><button class="btn small" data-add-row="vehicles|vehicles" data-add-defaults='{"rego":"NEW VEHICLE","vehicle_group":"Unassigned"}'>+ Vehicle</button>`:''}${editToggle('fleet')}</div></div>
-    <div class="table-wrap"><table class="table fleet-table"><thead><tr>${cols.map(c=>{
+    <div class="table-wrap" data-resize-key="fleet"><table class="table fleet-table"><thead><tr>${cols.map(c=>{
       const isExtra=extraKeys.includes(c);
       return isExtra&&editing?`<th class="col-removable">${esc(c)}<button class="col-del-x" data-del-field="vehicles|vehicles|${esc(c)}">×</button></th>`:`<th>${esc(c)}</th>`;
     }).join('')}${editing?'<th></th>':''}</tr></thead><tbody>${rowsHtml}</tbody></table></div>
@@ -837,6 +895,8 @@ function render(){
   document.querySelectorAll('[data-eupload-table]').forEach(el=>el.onchange=()=>handleFileUpload(el));
   wireGenericTable();
   processPdfThumbs();
+  restorePanelSizes();
+  wireColumnDrag();
 }
 
 loadData();
