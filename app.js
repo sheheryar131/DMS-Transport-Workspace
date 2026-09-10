@@ -212,18 +212,62 @@ function unpopField(el){
   el.style.left=''; el.style.top=''; el.style.width='';
 }
 
+function zoomControls(key){
+  return `<div class="zoom-controls" data-zoom-key="${esc(key)}">
+    <button class="zoom-btn" data-zoom-action="out" title="Shrink to fit more">−</button>
+    <span class="zoom-pct" data-zoom-display>100%</span>
+    <button class="zoom-btn" data-zoom-action="in" title="Enlarge text">+</button>
+    <button class="zoom-btn zoom-fit" data-zoom-action="fit" title="Auto-fit width">⤢ Fit</button>
+  </div>`;
+}
+function getZoom(key){
+  const saved = localStorage.getItem('zoom:'+key);
+  return saved ? parseFloat(saved) : null;
+}
+function setZoom(key, pct){
+  pct = Math.max(45, Math.min(150, pct));
+  localStorage.setItem('zoom:'+key, pct);
+  applyZoomToKey(key, pct);
+}
+function computeFitZoom(wrap){
+  const table = wrap.querySelector('table');
+  if(!table) return 100;
+  const naturalScroll = table.scrollWidth;
+  const available = wrap.clientWidth;
+  if(naturalScroll<=available || naturalScroll===0) return 100;
+  return Math.max(45, Math.floor((available/naturalScroll)*100));
+}
+function applyZoomToKey(key, pct){
+  document.querySelectorAll(`[data-resize-key="${CSS.escape(key)}"]`).forEach(wrap=>{
+    const table = wrap.querySelector('table');
+    if(table) table.style.zoom = pct+'%';
+  });
+  document.querySelectorAll(`.zoom-controls[data-zoom-key="${CSS.escape(key)}"] [data-zoom-display]`).forEach(el=>el.textContent=pct+'%');
+}
 function restorePanelSizes(){
-  document.querySelectorAll('[data-resize-key]').forEach(el=>{
-    const key = 'panelHeight:'+el.dataset.resizeKey;
-    const saved = localStorage.getItem(key);
-    if(saved) el.style.height = saved+'px';
-    if(!el._resizeObserved){
-      el._resizeObserved = true;
-      const ro = new ResizeObserver(()=>{
-        localStorage.setItem(key, Math.round(el.getBoundingClientRect().height));
-      });
-      ro.observe(el);
+  document.querySelectorAll('[data-resize-key]').forEach(wrap=>{
+    const key = wrap.dataset.resizeKey;
+    let pct = getZoom(key);
+    if(pct==null){
+      pct = computeFitZoom(wrap);
+      localStorage.setItem('zoom:'+key, pct);
     }
+    applyZoomToKey(key, pct);
+  });
+  document.querySelectorAll('.zoom-controls').forEach(ctrl=>{
+    ctrl.querySelectorAll('[data-zoom-action]').forEach(btn=>{
+      btn.onclick=()=>{
+        const key = ctrl.dataset.zoomKey;
+        const current = getZoom(key) ?? 100;
+        const action = btn.dataset.zoomAction;
+        if(action==='in') setZoom(key, current+10);
+        else if(action==='out') setZoom(key, current-10);
+        else if(action==='fit'){
+          const wrap = document.querySelector(`[data-resize-key="${CSS.escape(key)}"]`);
+          if(wrap) setZoom(key, computeFitZoom(wrap));
+        }
+      };
+    });
   });
 }
 
@@ -303,7 +347,7 @@ function dashboard(){
   </div>
   <div class="grid-2">
     <div class="panel"><div class="panel-head"><h3>Recent bookings</h3></div>
-      ${recentRows.length ? `<div class="table-wrap" data-resize-key="dashboard-bookings"><table class="table"><thead><tr><th>Booking</th><th>Passenger</th><th>Date</th><th>Driver</th><th>Status</th></tr></thead><tbody>${recentRows.map(b=>`<tr class="${rowStatusClass(b.status)}"><td><strong>${esc(b.booking_code)}</strong></td><td>${esc(b.passenger_name||'—')}</td><td>${fmtDate(b.booking_date)}</td><td>${esc(personName(b.driver_id))}</td><td>${badge(b.status)}</td></tr>`).join('')}${remaining>0?`<tr class="show-more-row"><td colspan="5"><button class="link-btn" id="showMoreBookings">Show ${remaining} more →</button></td></tr>`:(state.bookingsShowAll && state.bookings.length>3?`<tr class="show-more-row"><td colspan="5"><button class="link-btn" id="showLessBookings">Show less</button></td></tr>`:'')}</tbody></table></div>` : '<div class="empty">No bookings yet.</div>'}
+      ${recentRows.length ? `<div class="table-wrap" data-resize-key="dashboard-bookings"><table class="table"><thead><tr><th>Booking</th><th>Passenger</th><th>Date</th><th>Driver</th><th>Status</th></tr></thead><tbody>${recentRows.map(b=>`<tr data-detail-table="bookings" data-detail-id="${b.id}" class="clickable-check ${rowStatusClass(b.status)}"><td><strong>${esc(b.booking_code)}</strong></td><td>${esc(b.passenger_name||'—')}</td><td>${fmtDate(b.booking_date)}</td><td>${esc(personName(b.driver_id))}</td><td>${badge(b.status)}</td></tr>`).join('')}${remaining>0?`<tr class="show-more-row"><td colspan="5"><button class="link-btn" id="showMoreBookings">Show ${remaining} more →</button></td></tr>`:(state.bookingsShowAll && state.bookings.length>3?`<tr class="show-more-row"><td colspan="5"><button class="link-btn" id="showLessBookings">Show less</button></td></tr>`:'')}</tbody></table></div>` : '<div class="empty">No bookings yet.</div>'}
     </div>
     <div class="panel"><div class="panel-head"><h3>Fleet &amp; Compliance Snapshot</h3></div><div class="panel-body">
       ${expiringVehicles.length ? expiringVehicles.map(v=>`<div class="connection"><strong>${esc(v.rego)}</strong><span class="${v.days<=7?'warn':''}" style="${v.days<=7?'':'color:var(--muted)'}">${esc(v.label)} in ${v.days}d (${fmtDate(v.date)})</span></div>`).join('') : '<div class="connection"><strong>No expiries due soon</strong><span class="ok">All clear</span></div>'}
@@ -324,12 +368,12 @@ function bookingsPage(){
   if(!state.bookings.length) return `<div class="panel"><div class="panel-head"><h3>Master Bookings</h3><div class="col-actions">${editToggle('bookings')}</div></div><div class="empty">No bookings yet.</div></div>`;
   const cols = ['Booking','Passenger','Date / Time','Pickup','Drop-off','Driver','Vehicle','Funding','Status',...extraKeys];
   return `<div class="panel ${editing?'editing-mode':''}">
-    <div class="panel-head"><h3>Master Bookings</h3><div class="col-actions">${editing?`<button class="col-add-btn" data-add-field="bookings|bookings">+ Field</button>`:''}${editToggle('bookings')}</div></div>
+    <div class="panel-head"><h3>Master Bookings</h3><div class="col-actions">${zoomControls('bookings')}${editing?`<button class="col-add-btn" data-add-field="bookings|bookings">+ Field</button>`:''}${editToggle('bookings')}</div></div>
     <div class="table-wrap" data-resize-key="bookings"><table class="table"><thead><tr>${cols.map(c=>{
       const isExtra = extraKeys.includes(c);
       return isExtra && editing ? `<th class="col-removable">${esc(c)}<button class="col-del-x" data-del-field="bookings|bookings|${esc(c)}">×</button></th>` : `<th>${esc(c)}</th>`;
     }).join('')}${editing?'<th></th>':''}</tr></thead><tbody>
-    ${state.bookings.map(b=>`<tr class="${rowStatusClass(b.status)}">
+    ${state.bookings.map(b=>`<tr ${editing?'':`data-detail-table="bookings" data-detail-id="${b.id}"`} class="${editing?'':'clickable-check '}${rowStatusClass(b.status)}">
       <td>${editing?eText('bookings','bookings',b.id,'booking_code',b.booking_code):`<strong>${esc(b.booking_code)}</strong>`}</td>
       <td>${editing?eText('bookings','bookings',b.id,'passenger_name',b.passenger_name):esc(b.passenger_name||'—')}</td>
       <td>${editing?eText('bookings','bookings',b.id,'booking_date',b.booking_date,{type:'date'})+eText('bookings','bookings',b.id,'requested_time',b.requested_time,{type:'time'}):`${fmtDate(b.booking_date)}<br>${fmtTime(b.requested_time)}`}</td>
@@ -396,6 +440,7 @@ function editablePage({pageKey,title,table,stateKey,cols,addDefaults,rowAttrs}){
   allCols = order.map(l=>allCols.find(c=>c.label===l)).filter(Boolean);
   return `<div class="panel ${editing?'editing-mode':''}">
     <div class="panel-head"><h3>${title}</h3><div class="col-actions">
+      ${zoomControls(stateKey)}
       ${editing?`<button class="col-add-btn" data-add-field="${table}|${stateKey}">+ Field</button>`:''}
       ${editing&&addDefaults!==undefined?`<button class="btn small" data-add-row="${table}|${stateKey}" data-add-defaults='${JSON.stringify(addDefaults)}'>+ Row</button>`:''}
       ${editToggle(pageKey)}
@@ -540,7 +585,7 @@ function silPage(){
   return `<div class="grid-2">${sub.map(s=>{
     const editing = !!editState[s.key];
     const rows = state[s.key];
-    return `<div class="panel ${editing?'editing-mode':''}"><div class="panel-head"><h3>${s.title}</h3>${editToggle(s.key)}</div>
+    return `<div class="panel ${editing?'editing-mode':''}"><div class="panel-head"><h3>${s.title}</h3><div class="col-actions">${zoomControls('sil-'+s.key)}${editToggle(s.key)}</div></div>
     ${!rows.length?'<div class="empty">No records yet.</div>':`<div class="table-wrap" data-resize-key="sil-${s.key}"><table class="table"><thead><tr>${s.cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr ${editing?'':`data-detail-table="${s.key}" data-detail-id="${r.id}"`} class="${editing?'':'clickable-check'}">${s.cols.map(c=>`<td>${c.render(r,editing)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
     </div>`;
   }).join('')}</div>`;
@@ -590,7 +635,7 @@ function fleetPage(){
     return `<tr class="group-row" style="--gcolor:${groupColor}"><td colspan="${cols.length+(editing?1:0)}" style="background:${groupColor}"><span class="group-title"><span class="group-ic">${groupIcon(g)}</span>${esc(g)} <span class="group-count">${state.vehicles.filter(v=>(v.vehicle_group||'Unassigned')===g).length}</span></span></td></tr>${groupRows}`;
   }).join('');
   return `<div class="panel ${editing?'editing-mode':''}">
-    <div class="panel-head"><h3>Fleet — Asset List</h3><div class="col-actions">${editing?`<button class="col-add-btn" data-add-field="vehicles|vehicles">+ Field</button><button class="btn small" data-add-row="vehicles|vehicles" data-add-defaults='{"rego":"NEW VEHICLE","vehicle_group":"Unassigned"}'>+ Vehicle</button>`:''}${editToggle('fleet')}</div></div>
+    <div class="panel-head"><h3>Fleet — Asset List</h3><div class="col-actions">${zoomControls('fleet')}${editing?`<button class="col-add-btn" data-add-field="vehicles|vehicles">+ Field</button><button class="btn small" data-add-row="vehicles|vehicles" data-add-defaults='{"rego":"NEW VEHICLE","vehicle_group":"Unassigned"}'>+ Vehicle</button>`:''}${editToggle('fleet')}</div></div>
     <div class="table-wrap" data-resize-key="fleet"><table class="table fleet-table"><thead><tr>${cols.map(c=>{
       const isExtra=extraKeys.includes(c);
       return isExtra&&editing?`<th class="col-removable">${esc(c)}<button class="col-del-x" data-del-field="vehicles|vehicles|${esc(c)}">×</button></th>`:`<th>${esc(c)}</th>`;
@@ -637,6 +682,31 @@ function formatDateObj(v){
   }
   return null;
 }
+function isMatrixShape(v){
+  if(!v || typeof v!=='object' || Array.isArray(v)) return false;
+  const keys = Object.keys(v).filter(k=>k!=='colIds' && k!=='rowIds');
+  return keys.length>0 && keys.every(k=>/^\d+$/.test(k));
+}
+function extractMatrixCellValues(cell){
+  if(Array.isArray(cell)) return cell.filter(Boolean);
+  if(cell && typeof cell==='object') return Object.values(cell).filter(Boolean);
+  return cell ? [cell] : [];
+}
+function formatMatrixValue(v){
+  const entries = Object.entries(v).filter(([k])=>k!=='colIds' && k!=='rowIds');
+  const counts = {};
+  let answered = 0;
+  entries.forEach(([,cell])=>{
+    const vals = extractMatrixCellValues(cell);
+    if(vals.length) answered++;
+    vals.forEach(x=>{ counts[String(x)] = (counts[String(x)]||0)+1; });
+  });
+  const total = entries.length;
+  const parts = Object.entries(counts).map(([k,c])=>`${esc(k)} (${c})`);
+  if(!parts.length) return `<span class="muted">${answered}/${total} answered</span>`;
+  return `${parts.join(', ')} <span class="muted">— ${answered}/${total} items</span>`;
+}
+
 function renderPayloadValue(key,v){
   if(v==null || v==='') return '<span class="muted">—</span>';
   const dateStr = formatDateObj(v);
@@ -648,6 +718,7 @@ function renderPayloadValue(key,v){
     return esc(v.filter(Boolean).join(', ')) || '<span class="muted">—</span>';
   }
   if(typeof v==='object'){
+    if(isMatrixShape(v)) return formatMatrixValue(v);
     const vals = Object.entries(v).filter(([k])=>k!=='other').map(([,x])=>x);
     const other = v.other;
     const flat = [...vals, other].filter(x=>x!=null && x!=='');
@@ -812,9 +883,9 @@ function complianceBadge(row){
 
 
 function genericDetailModal(table,id){
-  const source={checks:state.checks,transfers:state.transfers,incidents:state.incidents,orientation:state.orientation,silMaintenance:state.silMaintenance,firstAid:state.firstAid,silVisitors:state.silVisitors}[table]||[];
+  const source={checks:state.checks,transfers:state.transfers,incidents:state.incidents,orientation:state.orientation,silMaintenance:state.silMaintenance,firstAid:state.firstAid,silVisitors:state.silVisitors,bookings:state.bookings}[table]||[];
   const row=source.find(x=>x.id===id); if(!row)return;
-  const titles={checks:row.check_type==='pre_start'?'Pre-start Check':'Post-shift Check',transfers:'Transport Service Log',incidents:'Incident Report',orientation:'Worker Orientation Checklist',silMaintenance:'SIL / Office Maintenance Checklist',firstAid:'First Aid Checklist',silVisitors:'SIL Visitor Check In'};
+  const titles={checks:row.check_type==='pre_start'?'Pre-start Check':'Post-shift Check',transfers:'Transport Service Log',incidents:'Incident Report',orientation:'Worker Orientation Checklist',silMaintenance:'SIL / Office Maintenance Checklist',firstAid:'First Aid Checklist',silVisitors:'SIL Visitor Check In',bookings:'Booking Submission'};
   const p=row.payload||{};
   const issueSummary = table==='checks' ? (()=>{
     const issues=checkIssues(row);
@@ -888,7 +959,10 @@ function render(){
   document.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>{state.current=x.dataset.page;render()});
   document.querySelector('#refreshBtn').onclick=refreshWithSplash;
   document.querySelector('#newBookingBtn')?.addEventListener('click',newBookingModal);
-  document.querySelectorAll('[data-detail-table]').forEach(tr=>tr.onclick=()=>genericDetailModal(tr.dataset.detailTable,tr.dataset.detailId));
+  document.querySelectorAll('[data-detail-table]').forEach(tr=>tr.onclick=(e)=>{
+    if(['INPUT','SELECT','BUTTON','A','TEXTAREA'].includes(e.target.tagName)) return;
+    genericDetailModal(tr.dataset.detailTable,tr.dataset.detailId);
+  });
   document.querySelector('#notifSettingsForm')?.addEventListener('submit',saveNotificationSettings);
   document.querySelector('#showMoreBookings')?.addEventListener('click',()=>{state.bookingsShowAll=true;render();});
   document.querySelector('#showLessBookings')?.addEventListener('click',()=>{state.bookingsShowAll=false;render();});

@@ -157,6 +157,7 @@ function mapBooking(payload, formId, submissionId) {
     vehicle_type: field(payload, 'Vehicle Requirements') || field(payload, 'Please select the vehicle type required for this trip.'),
     quoted_cost: field(payload, 'Quoted Amount', num) || field(payload, 'quote_amount', num),
     status: isNdis ? 'Needs Review' : 'Pending',
+    payload,
     notes: notesParts.join(' | ') || null,
   };
 }
