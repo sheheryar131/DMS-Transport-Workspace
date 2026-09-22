@@ -228,9 +228,13 @@ function getZoom(key){
   const saved = localStorage.getItem('zoom:'+key);
   return saved ? parseFloat(saved) : null;
 }
-function setZoom(key, pct){
+function isManualZoom(key){
+  return localStorage.getItem('zoomManual:'+key) === '1';
+}
+function setZoom(key, pct, manual=true){
   pct = Math.max(45, Math.min(150, pct));
   localStorage.setItem('zoom:'+key, pct);
+  if(manual) localStorage.setItem('zoomManual:'+key, '1');
   applyZoomToKey(key, pct);
 }
 function computeFitZoom(wrap){
@@ -255,8 +259,10 @@ function applyZoomToKey(key, pct){
 function restorePanelSizes(){
   document.querySelectorAll('[data-resize-key]').forEach(wrap=>{
     const key = wrap.dataset.resizeKey;
-    let pct = getZoom(key);
-    if(pct==null){
+    let pct;
+    if(isManualZoom(key)){
+      pct = getZoom(key) ?? computeFitZoom(wrap);
+    } else {
       pct = computeFitZoom(wrap);
       localStorage.setItem('zoom:'+key, pct);
     }
@@ -268,11 +274,14 @@ function restorePanelSizes(){
         const key = ctrl.dataset.zoomKey;
         const current = getZoom(key) ?? 100;
         const action = btn.dataset.zoomAction;
-        if(action==='in') setZoom(key, current+10);
-        else if(action==='out') setZoom(key, current-10);
+        if(action==='in') setZoom(key, current+10, true);
+        else if(action==='out') setZoom(key, current-10, true);
         else if(action==='fit'){
           const wrap = document.querySelector(`[data-resize-key="${CSS.escape(key)}"]`);
-          if(wrap) setZoom(key, computeFitZoom(wrap));
+          if(wrap){
+            localStorage.removeItem('zoomManual:'+key);
+            setZoom(key, computeFitZoom(wrap), false);
+          }
         }
       };
     });
