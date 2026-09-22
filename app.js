@@ -38,7 +38,7 @@ const state = {
   bookings:[], staff:[], vehicles:[], checks:[], transfers:[], incidents:[], stock:[], astp:[],
   orientation:[], silMaintenance:[], firstAid:[], silVisitors:[], notificationSettings:null,
   feedbackSubs:[], medicationChecks:[], maintenanceRegister:[],
-  bookingsShowAll:false
+  bookingsShowAll:false, expiryAlertExpanded:false
 };
 const editState = {}; // pageKey -> boolean, tracks per-tab edit mode
 
@@ -935,9 +935,17 @@ function genericDetailModal(table,id){
 
 function integrations(){
   const ns = state.notificationSettings || {threshold_days:[30,14]};
+  const expanded = !!state.expiryAlertExpanded;
   return `<div class="panel"><div class="panel-body">
     <div class="connection"><strong>Jotform Integration</strong><span class="ok">Active</span></div>
-    <div class="connection"><strong>Vehicle Expiry Alert</strong><span class="ok">Active</span></div>
+    <div class="connection expiry-alert-row" id="expiryAlertToggle" style="cursor:pointer">
+      <strong>Vehicle Expiry Alert <span class="expand-hint">${expanded?'▲':'▼'} click to ${expanded?'collapse':'test'}</span></strong>
+      <span class="ok">Active</span>
+    </div>
+    ${expanded?`<div class="expiry-test-panel">
+      <p class="note">This runs the real daily check against your actual Fleet data. It will only send an email if a vehicle's registration or HVIS expiry genuinely falls within one of the day thresholds below right now — so "0 emails sent" can be a correct result, not a failure, if nothing is currently due.</p>
+      <button type="button" class="btn primary" id="sendTestEmailBtn">📧 Send test check now</button>
+    </div>`:''}
     <form id="notifSettingsForm" class="form-grid">
       <label class="span-2">Alert Email Interval (days before expiry, comma-separated e.g. 30,14,7)<input name="threshold_days" value="${esc((ns.threshold_days||[]).join(','))}" required></label>
       <div class="span-2 modal-actions"><button class="btn primary" type="submit">Save</button></div>
@@ -996,6 +1004,8 @@ function render(){
     genericDetailModal(tr.dataset.detailTable,tr.dataset.detailId);
   });
   document.querySelector('#notifSettingsForm')?.addEventListener('submit',saveNotificationSettings);
+  document.querySelector('#expiryAlertToggle')?.addEventListener('click',()=>{state.expiryAlertExpanded=!state.expiryAlertExpanded;render();});
+  document.querySelector('#sendTestEmailBtn')?.addEventListener('click',sendTestEmailCheck);
   document.querySelector('#showMoreBookings')?.addEventListener('click',()=>{state.bookingsShowAll=true;render();});
   document.querySelector('#showLessBookings')?.addEventListener('click',()=>{state.bookingsShowAll=false;render();});
   document.querySelectorAll('[data-eupload-table]').forEach(el=>el.onchange=()=>handleFileUpload(el));

@@ -337,3 +337,10 @@ th.col-removable:hover .col-del-x{opacity:1}
 
 /* Consistent focus ring on all actionable chrome */
 .link-btn:focus-visible,.zoom-btn:focus-visible,.col-add-btn:focus-visible,.nav-item:focus-visible{outline:2px solid var(--teal);outline-offset:2px;border-radius:6px}
+
+/* ===== Expiry alert expandable row ===== */
+.expiry-alert-row{transition:background .15s}
+.expiry-alert-row:hover{background:var(--teal-tint)}
+.expand-hint{font-size:11px;font-weight:600;color:var(--muted);margin-left:8px}
+.expiry-test-panel{padding:14px 16px;background:var(--surface-2);border-radius:10px;margin:8px 0 4px;border:1px solid var(--line)}
+.expiry-test-panel .note{margin:0 0 12px}
