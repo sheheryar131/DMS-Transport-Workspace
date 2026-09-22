@@ -116,7 +116,7 @@ function shell(body){
     <div class="brand"><img class="brand-mark brand-logo" src="https://dmsassistedtransport.com.au/wp-content/uploads/2025/09/favicon-300x300.jpg" alt="DMS" onerror="this.outerHTML='<div class=&quot;brand-mark&quot;>D</div>'">DMS Workspace</div>
     <div class="nav-section">Operations</div>
     ${nav.map(([id,n])=>`<div class="nav-item ${id===state.current?'active':''}" data-page="${id}">${navIcons[id]}${n}</div>`).join('')}
-  </aside><main class="main"><header class="topbar"><strong>DMS / Transport</strong><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button><div class="user-chip"><div class="avatar">D</div><span>DMS Workspace</span></div></div></header>
+  </aside><main class="main"><header class="topbar"><strong>DMS Compliance</strong><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button><div class="user-chip"><div class="avatar">D</div><span>DMS Workspace</span></div></div></header>
   <div class="content"><div class="page-title"><div><h1>${title}</h1><p>${sub}</p></div>${state.current==='bookings'?'<button class="btn primary" id="newBookingBtn">+ New booking</button>':''}</div>
   ${state.error?`<div class="error-banner">${esc(state.error)}</div>`:''}${state.loading?'<div class="loading-bar">Loading live data…</div>':''}${body}</div></main></div>`;
 }
@@ -937,7 +937,7 @@ function integrations(){
   const ns = state.notificationSettings || {threshold_days:[30,14]};
   return `<div class="panel"><div class="panel-body">
     <div class="connection"><strong>Jotform Integration</strong><span class="ok">Active</span></div>
-    <div class="connection"><strong>Vehicle Expiry Alert</strong><span class="warn">In Progress</span></div>
+    <div class="connection"><strong>Vehicle Expiry Alert</strong><span class="ok">Active</span></div>
     <form id="notifSettingsForm" class="form-grid">
       <label class="span-2">Alert Email Interval (days before expiry, comma-separated e.g. 30,14,7)<input name="threshold_days" value="${esc((ns.threshold_days||[]).join(','))}" required></label>
       <div class="span-2 modal-actions"><button class="btn primary" type="submit">Save</button></div>

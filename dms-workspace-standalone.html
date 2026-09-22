@@ -133,7 +133,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* Editable table cells */
 .editing-mode .table td{position:relative}
-.table td input,.table td select{width:100%;min-width:56px;border:1px solid transparent;border-radius:6px;padding:6px 7px;background:transparent;font-size:12.5px;transition:all .15s var(--ease)}
+.table td input,.table td select{width:100%;min-width:82px;border:1px solid transparent;border-radius:6px;padding:6px 7px;background:transparent;font-size:12.5px;transition:all .15s var(--ease)}
 .table td select{appearance:none;-webkit-appearance:none;min-width:130px;padding-right:28px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%237C8598' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;cursor:pointer}
 .editing-mode .table td input,.editing-mode .table td select{border-color:var(--line);background:var(--surface)}
 .editing-mode .table td input:hover,.editing-mode .table td select:hover{border-color:var(--ochre)}
@@ -472,7 +472,7 @@ function shell(body){
     <div class="brand"><img class="brand-mark brand-logo" src="https://dmsassistedtransport.com.au/wp-content/uploads/2025/09/favicon-300x300.jpg" alt="DMS" onerror="this.outerHTML='<div class=&quot;brand-mark&quot;>D</div>'">DMS Workspace</div>
     <div class="nav-section">Operations</div>
     ${nav.map(([id,n])=>`<div class="nav-item ${id===state.current?'active':''}" data-page="${id}">${navIcons[id]}${n}</div>`).join('')}
-  </aside><main class="main"><header class="topbar"><strong>DMS / Transport</strong><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button><div class="user-chip"><div class="avatar">D</div><span>DMS Workspace</span></div></div></header>
+  </aside><main class="main"><header class="topbar"><strong>DMS Compliance</strong><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button><div class="user-chip"><div class="avatar">D</div><span>DMS Workspace</span></div></div></header>
   <div class="content"><div class="page-title"><div><h1>${title}</h1><p>${sub}</p></div>${state.current==='bookings'?'<button class="btn primary" id="newBookingBtn">+ New booking</button>':''}</div>
   ${state.error?`<div class="error-banner">${esc(state.error)}</div>`:''}${state.loading?'<div class="loading-bar">Loading live data…</div>':''}${body}</div></main></div>`;
 }
@@ -1293,7 +1293,7 @@ function integrations(){
   const ns = state.notificationSettings || {threshold_days:[30,14]};
   return `<div class="panel"><div class="panel-body">
     <div class="connection"><strong>Jotform Integration</strong><span class="ok">Active</span></div>
-    <div class="connection"><strong>Vehicle Expiry Alert</strong><span class="warn">In Progress</span></div>
+    <div class="connection"><strong>Vehicle Expiry Alert</strong><span class="ok">Active</span></div>
     <form id="notifSettingsForm" class="form-grid">
       <label class="span-2">Alert Email Interval (days before expiry, comma-separated e.g. 30,14,7)<input name="threshold_days" value="${esc((ns.threshold_days||[]).join(','))}" required></label>
       <div class="span-2 modal-actions"><button class="btn primary" type="submit">Save</button></div>
