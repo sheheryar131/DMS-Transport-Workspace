@@ -18,6 +18,9 @@ const FORM_IDS = {
   SIL_MAINTENANCE: '260138289199873',
   FIRST_AID: '253227624992060',
   SIL_VISITOR: '260138249053858',
+  FEEDBACK: '260618231286052',
+  MEDICATION_CHECK: '260628723360052',
+  MAINTENANCE_REGISTER: '260628687541062',
 };
 
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -262,6 +265,64 @@ function mapSilVisitor(payload, formId, submissionId) {
   };
 }
 
+function mapFeedback(payload, formId, submissionId) {
+  return {
+    source_form_id: formId, source_submission_id: submissionId,
+    type: field(payload, 'This is a:'),
+    respondent_role: field(payload, 'I am a:'),
+    overall_satisfaction: field(payload, 'How satisfied are you with your overall experience as a support worker at DMS?'),
+    communication_rating: field(payload, 'How would your rate the communication and support provided by DMS'),
+    training_rating: field(payload, 'How well does DMS provide the necessary resources and training for your role?'),
+    policy_clarity_rating: field(payload, 'How would your rate the clarity of policies, procedures, and expectations in your role?'),
+    support_rating: field(payload, 'How supported do you feel in addressing challenges or concerns in your role?'),
+    recommend_rating: field(payload, 'How likely are you to recommend DMS as a workplace to other support workers?'),
+    improvement_suggestions: field(payload, 'Would you like to provide any additional comments, suggestions, or areas for improvement?'),
+    name: field(payload, 'Name'),
+    email: field(payload, 'Email'),
+    phone: field(payload, 'Phone Number'),
+    submitted_date: field(payload, 'Date', dateVal),
+    payload,
+  };
+}
+
+function mapMedicationCheck(payload, formId, submissionId) {
+  return {
+    source_form_id: formId, source_submission_id: submissionId,
+    participant_name: field(payload, 'Participant name'),
+    participant_dob: field(payload, 'Participant Date Of Birth', dateVal),
+    medication_name: field(payload, 'Name of Medication'),
+    script_received_dr: field(payload, 'Script Received Dr'),
+    script_given_to_pharmacy: field(payload, 'Script Given to Pharmacy'),
+    dose: field(payload, 'Dose'),
+    frequency: field(payload, 'Frequency'),
+    correct_on_pickup: field(payload, 'Correct on Pickup'),
+    special_instructions: field(payload, 'Special Instructions From Pharmacist'),
+    pack_start_date: field(payload, 'Start Date Of Pack', dateVal),
+    pack_end_date: field(payload, 'End Date Of Pack', dateVal),
+    comments: field(payload, 'Any Comments'),
+    pickup_date: field(payload, 'Pickup Date', dateVal),
+    staff_signature_url: field(payload, 'Signature Of The Staff'),
+    payload,
+  };
+}
+
+function mapMaintenanceRegister(payload, formId, submissionId) {
+  return {
+    source_form_id: formId, source_submission_id: submissionId,
+    responsible_person: field(payload, 'Responsible person'),
+    date_identified: field(payload, 'Date Identified', dateVal),
+    area_asset: field(payload, 'Area/ Asset'),
+    issue_identified: field(payload, 'Issue Identified'),
+    risk_level: field(payload, 'Risk Level'),
+    temp_risk_control: field(payload, 'Temporary Risk Control Taken (If Required)'),
+    action_taken: field(payload, 'Action Taken'),
+    date_completed: field(payload, 'Date Completed', dateVal),
+    office_address: field(payload, 'Office Address'),
+    signature_url: field(payload, 'Signature'),
+    payload,
+  };
+}
+
 // ---- supabase helpers ----
 
 async function sbUpsert(table, conflictCol, rows) {
@@ -311,6 +372,12 @@ async function route(formId, submissionId, payload) {
     await sbUpsert('first_aid_checks', 'source_submission_id', [mapFirstAid(payload, formId, submissionId)]);
   } else if (formId === FORM_IDS.SIL_VISITOR) {
     await sbUpsert('sil_visitor_checkins', 'source_submission_id', [mapSilVisitor(payload, formId, submissionId)]);
+  } else if (formId === FORM_IDS.FEEDBACK) {
+    await sbUpsert('feedback_submissions', 'source_submission_id', [mapFeedback(payload, formId, submissionId)]);
+  } else if (formId === FORM_IDS.MEDICATION_CHECK) {
+    await sbUpsert('medication_checks', 'source_submission_id', [mapMedicationCheck(payload, formId, submissionId)]);
+  } else if (formId === FORM_IDS.MAINTENANCE_REGISTER) {
+    await sbUpsert('maintenance_register', 'source_submission_id', [mapMaintenanceRegister(payload, formId, submissionId)]);
   }
   // Unrecognized forms: kept in jotform_submissions only (raw), no routing.
 }

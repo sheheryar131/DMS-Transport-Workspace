@@ -37,6 +37,7 @@ const state = {
   current:'dashboard', loading:false, error:'',
   bookings:[], staff:[], vehicles:[], checks:[], transfers:[], incidents:[], stock:[], astp:[],
   orientation:[], silMaintenance:[], firstAid:[], silVisitors:[], notificationSettings:null,
+  feedbackSubs:[], medicationChecks:[], maintenanceRegister:[],
   bookingsShowAll:false
 };
 const editState = {}; // pageKey -> boolean, tracks per-tab edit mode
@@ -73,11 +74,14 @@ async function loadData(){
     supabase.from('orientation_checklists').select('*').order('created_at',{ascending:false}).limit(200),
     supabase.from('sil_maintenance_checks').select('*').order('created_at',{ascending:false}).limit(200),
     supabase.from('first_aid_checks').select('*').order('created_at',{ascending:false}).limit(200),
-    supabase.from('sil_visitor_checkins').select('*').order('created_at',{ascending:false}).limit(200)
+    supabase.from('sil_visitor_checkins').select('*').order('created_at',{ascending:false}).limit(200),
+    supabase.from('feedback_submissions').select('*').order('created_at',{ascending:false}).limit(200),
+    supabase.from('medication_checks').select('*').order('created_at',{ascending:false}).limit(200),
+    supabase.from('maintenance_register').select('*').order('created_at',{ascending:false}).limit(200)
   ]);
   const err = queries.find(q=>q.error)?.error;
   if(err) state.error=err.message;
-  [state.bookings,state.staff,state.vehicles,state.checks,state.transfers,state.incidents,state.stock,state.astp,state.orientation,state.silMaintenance,state.firstAid,state.silVisitors] = queries.map(q=>q.data||[]);
+  [state.bookings,state.staff,state.vehicles,state.checks,state.transfers,state.incidents,state.stock,state.astp,state.orientation,state.silMaintenance,state.firstAid,state.silVisitors,state.feedbackSubs,state.medicationChecks,state.maintenanceRegister] = queries.map(q=>q.data||[]);
   const {data:ns} = await supabase.from('notification_settings').select('*').eq('entity_type','vehicle_expiry').maybeSingle();
   state.notificationSettings = ns;
   state.loading=false; firstLoad=false; state.refreshedAt=Date.now(); render();
@@ -232,10 +236,14 @@ function setZoom(key, pct){
 function computeFitZoom(wrap){
   const table = wrap.querySelector('table');
   if(!table) return 100;
-  const naturalScroll = table.scrollWidth;
+  const prevZoom = table.style.zoom;
+  table.style.zoom = '100%';
+  const natural = table.scrollWidth;
+  table.style.zoom = prevZoom;
   const available = wrap.clientWidth;
-  if(naturalScroll<=available || naturalScroll===0) return 100;
-  return Math.max(45, Math.floor((available/naturalScroll)*100));
+  if(!natural) return 100;
+  const ratio = (available/natural)*100;
+  return Math.max(45, Math.min(140, Math.floor(ratio)));
 }
 function applyZoomToKey(key, pct){
   document.querySelectorAll(`[data-resize-key="${CSS.escape(key)}"]`).forEach(wrap=>{
@@ -581,6 +589,22 @@ function silPage(){
            {label:'Reason',render:(r,e)=>e?eText('sil_visitor_checkins','silVisitors',r.id,'reason_for_visit',r.reason_for_visit):esc(r.reason_for_visit||'—')},
            {label:'Duration',render:(r,e)=>e?eText('sil_visitor_checkins','silVisitors',r.id,'duration',r.duration):esc(r.duration||'—')},
            {label:'Date/Time',render:r=>r.visit_at?new Date(r.visit_at).toLocaleString('en-AU'):'—'}]},
+    {key:'feedbackSubs', title:'Feedback & Complaints', table:'feedback_submissions',
+     cols:[{label:'Type',render:(r,e)=>e?eText('feedback_submissions','feedbackSubs',r.id,'type',r.type):badge(r.type)},
+           {label:'Role',render:(r,e)=>e?eText('feedback_submissions','feedbackSubs',r.id,'respondent_role',r.respondent_role):esc(r.respondent_role||'—')},
+           {label:'Name',render:(r,e)=>e?eText('feedback_submissions','feedbackSubs',r.id,'name',r.name):esc(r.name||'—')},
+           {label:'Date',render:(r,e)=>e?eText('feedback_submissions','feedbackSubs',r.id,'submitted_date',r.submitted_date,{type:'date'}):fmtDate(r.submitted_date)}]},
+    {key:'medicationChecks', title:'Medication Checks (M1)', table:'medication_checks',
+     cols:[{label:'Participant',render:(r,e)=>e?eText('medication_checks','medicationChecks',r.id,'participant_name',r.participant_name):esc(r.participant_name||'—')},
+           {label:'Medication',render:(r,e)=>e?eText('medication_checks','medicationChecks',r.id,'medication_name',r.medication_name):esc(r.medication_name||'—')},
+           {label:'Dose',render:(r,e)=>e?eText('medication_checks','medicationChecks',r.id,'dose',r.dose):esc(r.dose||'—')},
+           {label:'Pickup Date',render:(r,e)=>e?eText('medication_checks','medicationChecks',r.id,'pickup_date',r.pickup_date,{type:'date'}):fmtDate(r.pickup_date)}]},
+    {key:'maintenanceRegister', title:'Ad Hoc Maintenance', table:'maintenance_register',
+     cols:[{label:'Area / Asset',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'area_asset',r.area_asset):esc(r.area_asset||'—')},
+           {label:'Issue',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'issue_identified',r.issue_identified):esc(r.issue_identified||'—')},
+           {label:'Risk',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'risk_level',r.risk_level):badge(r.risk_level)},
+           {label:'Responsible',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'responsible_person',r.responsible_person):esc(r.responsible_person||'—')},
+           {label:'Date Identified',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'date_identified',r.date_identified,{type:'date'}):fmtDate(r.date_identified)}]},
   ];
   return `<div class="grid-2">${sub.map(s=>{
     const editing = !!editState[s.key];
@@ -883,9 +907,9 @@ function complianceBadge(row){
 
 
 function genericDetailModal(table,id){
-  const source={checks:state.checks,transfers:state.transfers,incidents:state.incidents,orientation:state.orientation,silMaintenance:state.silMaintenance,firstAid:state.firstAid,silVisitors:state.silVisitors,bookings:state.bookings}[table]||[];
+  const source={checks:state.checks,transfers:state.transfers,incidents:state.incidents,orientation:state.orientation,silMaintenance:state.silMaintenance,firstAid:state.firstAid,silVisitors:state.silVisitors,bookings:state.bookings,feedbackSubs:state.feedbackSubs,medicationChecks:state.medicationChecks,maintenanceRegister:state.maintenanceRegister}[table]||[];
   const row=source.find(x=>x.id===id); if(!row)return;
-  const titles={checks:row.check_type==='pre_start'?'Pre-start Check':'Post-shift Check',transfers:'Transport Service Log',incidents:'Incident Report',orientation:'Worker Orientation Checklist',silMaintenance:'SIL / Office Maintenance Checklist',firstAid:'First Aid Checklist',silVisitors:'SIL Visitor Check In',bookings:'Booking Submission'};
+  const titles={checks:row.check_type==='pre_start'?'Pre-start Check':'Post-shift Check',transfers:'Transport Service Log',incidents:'Incident Report',orientation:'Worker Orientation Checklist',silMaintenance:'SIL / Office Maintenance Checklist',firstAid:'First Aid Checklist',silVisitors:'SIL Visitor Check In',bookings:'Booking Submission',feedbackSubs:'Feedback / Complaint',medicationChecks:'M1 Medication Check',maintenanceRegister:'Ad Hoc Maintenance Report'};
   const p=row.payload||{};
   const issueSummary = table==='checks' ? (()=>{
     const issues=checkIssues(row);
