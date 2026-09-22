@@ -614,10 +614,11 @@ function silPage(){
            {label:'Responsible',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'responsible_person',r.responsible_person):esc(r.responsible_person||'—')},
            {label:'Date Identified',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'date_identified',r.date_identified,{type:'date'}):fmtDate(r.date_identified)}]},
   ];
-  return `<div class="grid-2">${sub.map(s=>{
+  return `<div class="grid-2">${sub.map((s,i)=>{
     const editing = !!editState[s.key];
     const rows = state[s.key];
-    return `<div class="panel ${editing?'editing-mode':''}"><div class="panel-head"><h3>${s.title}</h3><div class="col-actions">${zoomControls('sil-'+s.key)}${editToggle(s.key)}</div></div>
+    const color = MONDAY_GROUP_COLORS[i % MONDAY_GROUP_COLORS.length];
+    return `<div class="panel sil-panel ${editing?'editing-mode':''}" style="--cat-color:${color}"><div class="panel-head"><h3><span class="cat-dot"></span>${s.title}</h3><div class="col-actions">${zoomControls('sil-'+s.key)}${editToggle(s.key)}</div></div>
     ${!rows.length?'<div class="empty">No records yet.</div>':`<div class="table-wrap" data-resize-key="sil-${s.key}"><table class="table"><thead><tr>${s.cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr ${editing?'':`data-detail-table="${s.key}" data-detail-id="${r.id}"`} class="${editing?'':'clickable-check'}">${s.cols.map(c=>`<td>${c.render(r,editing)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
     </div>`;
   }).join('')}</div>`;
@@ -935,17 +936,12 @@ function genericDetailModal(table,id){
 
 function integrations(){
   const ns = state.notificationSettings || {threshold_days:[30,14]};
-  const expanded = !!state.expiryAlertExpanded;
   return `<div class="panel"><div class="panel-body">
     <div class="connection"><strong>Jotform Integration</strong><span class="ok">Active</span></div>
-    <div class="connection expiry-alert-row" id="expiryAlertToggle" style="cursor:pointer">
-      <strong>Vehicle Expiry Alert <span class="expand-hint">${expanded?'▲':'▼'} click to ${expanded?'collapse':'test'}</span></strong>
-      <span class="ok">Active</span>
+    <div class="connection"><strong>Vehicle Expiry Alert</strong><span class="ok">Active</span></div>
+    <div class="modal-actions" style="justify-content:flex-start;margin:2px 0 16px">
+      <button type="button" class="btn primary" id="sendTestEmailBtn">📧 Send test email</button>
     </div>
-    ${expanded?`<div class="expiry-test-panel">
-      <p class="note">This runs the real daily check against your actual Fleet data. It will only send an email if a vehicle's registration or HVIS expiry genuinely falls within one of the day thresholds below right now — so "0 emails sent" can be a correct result, not a failure, if nothing is currently due.</p>
-      <button type="button" class="btn primary" id="sendTestEmailBtn">📧 Send test check now</button>
-    </div>`:''}
     <form id="notifSettingsForm" class="form-grid">
       <label class="span-2">Alert Email Interval (days before expiry, comma-separated e.g. 30,14,7)<input name="threshold_days" value="${esc((ns.threshold_days||[]).join(','))}" required></label>
       <div class="span-2 modal-actions"><button class="btn primary" type="submit">Save</button></div>
@@ -976,7 +972,11 @@ async function sendTestEmailCheck(){
     let json; try{json=JSON.parse(text);}catch{json=null;}
     if(!json){alert('Unexpected response: '+text.slice(0,300));return;}
     if(!json.ok){alert('Check failed: '+json.error);return;}
-    alert(`Check ran: ${json.checked} vehicles checked, ${json.matchingAlerts} matched a threshold, ${json.alertsSent} email(s) sent.\n\n${(json.details||[]).join('\n')||'No vehicles are within an alert threshold right now.'}`);
+    if(json.alertsSent>0){
+      alert(`✓ Test email sent.\n\n${(json.details||[]).join('\n')}\n\nCheck your inbox to confirm delivery.`);
+    } else {
+      alert(`No test email sent.\n\n${(json.details||[]).join('\n')||'No vehicles have any expiry date set to test with.'}`);
+    }
   }catch(e){alert('Could not run check: '+e.message);}
 }
 
@@ -1004,7 +1004,6 @@ function render(){
     genericDetailModal(tr.dataset.detailTable,tr.dataset.detailId);
   });
   document.querySelector('#notifSettingsForm')?.addEventListener('submit',saveNotificationSettings);
-  document.querySelector('#expiryAlertToggle')?.addEventListener('click',()=>{state.expiryAlertExpanded=!state.expiryAlertExpanded;render();});
   document.querySelector('#sendTestEmailBtn')?.addEventListener('click',sendTestEmailCheck);
   document.querySelector('#showMoreBookings')?.addEventListener('click',()=>{state.bookingsShowAll=true;render();});
   document.querySelector('#showLessBookings')?.addEventListener('click',()=>{state.bookingsShowAll=false;render();});

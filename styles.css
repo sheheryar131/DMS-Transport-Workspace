@@ -344,3 +344,9 @@ th.col-removable:hover .col-del-x{opacity:1}
 .expand-hint{font-size:11px;font-weight:600;color:var(--muted);margin-left:8px}
 .expiry-test-panel{padding:14px 16px;background:var(--surface-2);border-radius:10px;margin:8px 0 4px;border:1px solid var(--line)}
 .expiry-test-panel .note{margin:0 0 12px}
+
+/* ===== SIL & Care category colors (Monday-style) ===== */
+.sil-panel{border-top:4px solid var(--cat-color)}
+.sil-panel .panel-head{background:color-mix(in srgb, var(--cat-color) 8%, var(--surface-2))}
+.sil-panel .panel-head h3{display:flex;align-items:center;gap:9px}
+.cat-dot{width:10px;height:10px;border-radius:50%;background:var(--cat-color);display:inline-block;flex:0 0 auto;box-shadow:0 0 0 3px color-mix(in srgb, var(--cat-color) 18%, transparent)}

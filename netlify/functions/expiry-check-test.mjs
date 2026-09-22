@@ -11,6 +11,6 @@ export default async (req) => {
   if (url.searchParams.get('key') !== process.env.JOTFORM_WEBHOOK_SECRET) {
     return new Response('Unauthorized', { status: 401 });
   }
-  const result = await runExpiryCheck();
+  const result = await runExpiryCheck({ force: true });
   return Response.json(result);
 };

@@ -41,7 +41,7 @@ function daysUntil(dateStr) {
   return Math.round((target - today) / 86400000);
 }
 
-export async function runExpiryCheck({ ignoreLog = false } = {}) {
+export async function runExpiryCheck({ ignoreLog = false, force = false } = {}) {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.RESEND_API_KEY) {
     return { ok: false, error: 'Missing required env vars (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, or RESEND_API_KEY)' };
   }
@@ -50,8 +50,37 @@ export async function runExpiryCheck({ ignoreLog = false } = {}) {
   const settings = settingsRows[0];
   if (!settings) return { ok: false, error: 'No active notification_settings row for vehicle_expiry' };
 
-  const thresholds = settings.threshold_days || [30, 14];
   const vehicles = await sbGet('vehicles?select=id,rego,make_model,rego_expiry,hvis_expiry');
+
+  if (force) {
+    // Manual test mode: ignores thresholds entirely. Picks the soonest-expiring
+    // vehicle/date (whatever that is, due in 1 day or 300) and sends a clearly
+    // labeled test email, purely to confirm the send pipeline itself works.
+    const candidates = [];
+    for (const v of vehicles) {
+      for (const [field, label] of [['rego_expiry', 'Registration'], ['hvis_expiry', 'HVIS Inspection']]) {
+        if (v[field]) candidates.push({ vehicle: v, field, label, days: daysUntil(v[field]), dateVal: v[field] });
+      }
+    }
+    if (!candidates.length) {
+      return { ok: true, checked: vehicles.length, matchingAlerts: 0, alertsSent: 0, details: ['No vehicles have a Registration or HVIS expiry date set — nothing to send a test email about.'] };
+    }
+    candidates.sort((a, b) => a.days - b.days);
+    const a = candidates[0];
+    const subject = `🧪 TEST — ${a.vehicle.rego} — ${a.label} (${a.days} days)`;
+    const html = `<p style="background:#FCF1DE;padding:10px 14px;border-radius:8px;color:#B8791F;font-weight:600">This is a TEST email confirming your alert pipeline works — it ignores your configured day thresholds.</p>
+      <p><strong>${a.vehicle.rego}</strong> (${a.vehicle.make_model || 'vehicle'})</p>
+      <p>${a.label} expires on <strong>${a.dateVal}</strong> — that's ${a.days} days from today.</p>
+      <p>Real alerts will only send when a vehicle crosses one of your configured thresholds (e.g. 30, 14, 7 days before expiry).</p>`;
+    try {
+      await sendEmail(settings.recipient_email, subject, html);
+      return { ok: true, checked: vehicles.length, matchingAlerts: 1, alertsSent: 1, details: [`${a.vehicle.rego}: TEST email sent (${a.label}, ${a.days} days out) — sent regardless of threshold`] };
+    } catch (e) {
+      return { ok: true, checked: vehicles.length, matchingAlerts: 1, alertsSent: 0, details: [`Test email failed to send: ${e}`] };
+    }
+  }
+
+  const thresholds = settings.threshold_days || [30, 14];
 
   const alerts = [];
   for (const v of vehicles) {
