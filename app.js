@@ -243,11 +243,10 @@ function computeFitZoom(wrap){
   const prevZoom = table.style.zoom;
   table.style.zoom = '100%';
   const natural = table.scrollWidth;
-  table.style.zoom = prevZoom;
   const available = wrap.clientWidth;
-  if(!natural) return 100;
-  const ratio = (available/natural)*100;
-  return Math.max(45, Math.min(140, Math.floor(ratio)));
+  table.style.zoom = prevZoom;
+  if(natural<=available || natural===0) return 100;
+  return Math.max(45, Math.floor((available/natural)*100));
 }
 function applyZoomToKey(key, pct){
   document.querySelectorAll(`[data-resize-key="${CSS.escape(key)}"]`).forEach(wrap=>{
