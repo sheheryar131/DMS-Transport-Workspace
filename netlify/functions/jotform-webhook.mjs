@@ -115,6 +115,16 @@ function findExactSuffix(payload, suffix) {
   return k ? payload[k] : undefined;
 }
 
+// Case-insensitive suffix match — handles both opaque names (typeA, typeA63)
+// used by the Transport forms and descriptive camelCase names (fullName,
+// silLocation) used by the SIL/Care forms, without needing to know which
+// convention a given form uses.
+function findCiSuffix(payload, suffix) {
+  const target = suffix.toLowerCase();
+  const k = Object.keys(payload).find((x) => x.replace(/^q\d+_/, '').toLowerCase() === target);
+  return k ? payload[k] : undefined;
+}
+
 function mapVehicleCheck(payload, checkType) {
   return {
     check_type: checkType,
@@ -212,12 +222,12 @@ function mapOrientation(payload, formId, submissionId) {
   return {
     source_form_id: formId,
     source_submission_id: submissionId,
-    participant_name: field(payload, 'Participant Name'),
-    sil_location: field(payload, 'SIL Location') || text(findExactSuffix(payload, 'typeA63')),
-    support_worker_name: field(payload, 'Support Worker Name'),
-    trainer_name: field(payload, 'Trainer / Inductor Name'),
+    participant_name: field(payload, 'Full Name') || text(findCiSuffix(payload, 'fullName')),
+    sil_location: field(payload, 'SIL Location') || text(findCiSuffix(payload, 'silLocation')) || text(findExactSuffix(payload, 'typeA63')),
+    support_worker_name: field(payload, 'Support Worker') || text(findCiSuffix(payload, 'supportWorker')),
+    trainer_name: field(payload, 'Trainer') || text(findCiSuffix(payload, 'trainer')),
     check_date: field(payload, 'Date', dateVal),
-    notes: field(payload, 'Additional Notes'),
+    notes: field(payload, 'Additional Notes') || text(findCiSuffix(payload, 'additionalNotes')),
     payload,
   };
 }
@@ -226,12 +236,12 @@ function mapSilMaintenance(payload, formId, submissionId) {
   return {
     source_form_id: formId,
     source_submission_id: submissionId,
-    sil_location: field(payload, 'SIL / Office Location') || text(findExactSuffix(payload, 'typeA63')),
-    support_worker_name: field(payload, 'Support Worker Name'),
+    sil_location: field(payload, 'SIL Location') || field(payload, 'SIL / Office Location') || text(findCiSuffix(payload, 'silLocation')) || text(findExactSuffix(payload, 'typeA63')),
+    support_worker_name: field(payload, 'Support Worker') || field(payload, 'Support Worker Name') || text(findCiSuffix(payload, 'supportWorker')),
     check_date: field(payload, 'Date', dateVal),
-    outside_notes: text(findExactSuffix(payload, 'anyAdditional')),
-    inside_notes: text(findExactSuffix(payload, 'anyAdditional125')),
-    residents_notes: text(findExactSuffix(payload, 'anyAdditional128')),
+    outside_notes: text(findExactSuffix(payload, 'anyAdditional')) || text(findCiSuffix(payload, 'outsideNotes')),
+    inside_notes: text(findExactSuffix(payload, 'anyAdditional125')) || text(findCiSuffix(payload, 'insideNotes')),
+    residents_notes: text(findExactSuffix(payload, 'anyAdditional128')) || text(findCiSuffix(payload, 'residentsNotes')),
     payload,
   };
 }
@@ -240,9 +250,9 @@ function mapFirstAid(payload, formId, submissionId) {
   return {
     source_form_id: formId,
     source_submission_id: submissionId,
-    full_name: field(payload, 'Full Name') || text(findExactSuffix(payload, 'typeA')),
-    sil_location: field(payload, 'SIL Location') || text(findExactSuffix(payload, 'typeA63')),
-    items_used: field(payload, 'First Aid Stock List - Select Items Used') || text(findExactSuffix(payload, 'stock')),
+    full_name: field(payload, 'Full Name') || text(findCiSuffix(payload, 'fullName')) || text(findExactSuffix(payload, 'typeA')),
+    sil_location: field(payload, 'SIL Location') || text(findCiSuffix(payload, 'silLocation')) || text(findExactSuffix(payload, 'typeA63')),
+    items_used: field(payload, 'First Aid Stock List - Select Items Used') || field(payload, 'First Aid Stock Used') || text(findCiSuffix(payload, 'stock')) || text(findExactSuffix(payload, 'stock')),
     payload,
   };
 }
@@ -251,16 +261,16 @@ function mapSilVisitor(payload, formId, submissionId) {
   return {
     source_form_id: formId,
     source_submission_id: submissionId,
-    visitor_name: field(payload, 'Visitor Full Name') || text(findExactSuffix(payload, 'typeA')),
-    sil_location: field(payload, 'SIL Location') || text(findExactSuffix(payload, 'typeA63')),
-    reason_for_visit: field(payload, 'Reason for Visit'),
-    duration: field(payload, 'Estimated Duration of Visit'),
+    visitor_name: field(payload, 'Visitor Full Name') || field(payload, 'Full Name') || text(findCiSuffix(payload, 'fullName')) || text(findExactSuffix(payload, 'typeA')),
+    sil_location: field(payload, 'SIL Location') || text(findCiSuffix(payload, 'silLocation')) || text(findExactSuffix(payload, 'typeA63')),
+    reason_for_visit: field(payload, 'Reason for Visit') || text(findCiSuffix(payload, 'reasonForVisit')),
+    duration: field(payload, 'Estimated Duration of Visit') || text(findCiSuffix(payload, 'duration')),
     visit_at: (() => {
       const d = raw(payload, 'Date');
       const dt = dateVal(d); const tm = timeVal(d);
       return dt ? new Date(`${dt}T${tm || '00:00'}:00`).toISOString() : null;
     })(),
-    support_worker_name: field(payload, 'Name of On-Duty Support Worker'),
+    support_worker_name: field(payload, 'Name of On-Duty Support Worker') || field(payload, 'Support Worker') || text(findCiSuffix(payload, 'supportWorker')),
     payload,
   };
 }

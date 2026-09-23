@@ -360,7 +360,8 @@ th.col-removable:hover .col-del-x{opacity:1}
 .sil-panel{border-top:4px solid var(--cat-color)}
 .sil-panel .panel-head{background:color-mix(in srgb, var(--cat-color) 8%, var(--surface-2))}
 .sil-panel .panel-head h3{display:flex;align-items:center;gap:9px}
-.cat-dot{width:10px;height:10px;border-radius:50%;background:var(--cat-color);display:inline-block;flex:0 0 auto;box-shadow:0 0 0 3px color-mix(in srgb, var(--cat-color) 18%, transparent)}
+.cat-icon{width:19px;height:19px;color:var(--cat-color);display:inline-flex;flex:0 0 auto}
+.cat-icon svg{width:100%;height:100%}
 
   </style>
 </head>
@@ -942,6 +943,24 @@ function astpPage(){
 
 /* ===================== SIL & Care ===================== */
 
+function silCategoryIcon(key){
+  const icons = {
+    orientation: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+    silMaintenance: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L2 19l3 3 7.3-7.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-3-3z"/></svg>',
+    firstAid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v8M8 12h8"/></svg>',
+    silVisitors: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+    feedbackSubs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+    medicationChecks: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="17" height="17" rx="5" transform="rotate(45 12 12)"/><path d="M8 12h8"/></svg>',
+    maintenanceRegister: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+  };
+  return icons[key] || icons.orientation;
+}
+function truncate(s, max=44){
+  if(!s) return s;
+  const str = String(s);
+  return str.length>max ? str.slice(0,max)+'…' : str;
+}
+
 function silPage(){
   const sub = [
     {key:'orientation', title:'Orientation', table:'orientation_checklists',
@@ -954,16 +973,16 @@ function silPage(){
      cols:[{label:'SIL Location',render:(r,e)=>e?eText('sil_maintenance_checks','silMaintenance',r.id,'sil_location',r.sil_location):esc(r.sil_location||'—')},
            {label:'Support Worker',render:(r,e)=>e?eText('sil_maintenance_checks','silMaintenance',r.id,'support_worker_name',r.support_worker_name):esc(r.support_worker_name||'—')},
            {label:'Date',render:(r,e)=>e?eText('sil_maintenance_checks','silMaintenance',r.id,'check_date',r.check_date,{type:'date'}):fmtDate(r.check_date)},
-           {label:'Outside Notes',render:(r,e)=>e?eText('sil_maintenance_checks','silMaintenance',r.id,'outside_notes',r.outside_notes):esc(r.outside_notes||'—')},
-           {label:'Inside Notes',render:(r,e)=>e?eText('sil_maintenance_checks','silMaintenance',r.id,'inside_notes',r.inside_notes):esc(r.inside_notes||'—')}]},
+           {label:'Outside Notes',render:(r,e)=>e?eText('sil_maintenance_checks','silMaintenance',r.id,'outside_notes',r.outside_notes):esc(truncate(r.outside_notes)||'—')},
+           {label:'Inside Notes',render:(r,e)=>e?eText('sil_maintenance_checks','silMaintenance',r.id,'inside_notes',r.inside_notes):esc(truncate(r.inside_notes)||'—')}]},
     {key:'firstAid', title:'First Aid', table:'first_aid_checks',
      cols:[{label:'Staff',render:(r,e)=>e?eText('first_aid_checks','firstAid',r.id,'full_name',r.full_name):esc(r.full_name||'—')},
            {label:'SIL Location',render:(r,e)=>e?eText('first_aid_checks','firstAid',r.id,'sil_location',r.sil_location):esc(r.sil_location||'—')},
-           {label:'Items Used',render:(r,e)=>e?eText('first_aid_checks','firstAid',r.id,'items_used',r.items_used):esc(r.items_used||'—')}]},
+           {label:'Items Used',render:(r,e)=>e?eText('first_aid_checks','firstAid',r.id,'items_used',r.items_used):esc(truncate(r.items_used)||'—')}]},
     {key:'silVisitors', title:'Visitors', table:'sil_visitor_checkins',
      cols:[{label:'Visitor',render:(r,e)=>e?eText('sil_visitor_checkins','silVisitors',r.id,'visitor_name',r.visitor_name):esc(r.visitor_name||'—')},
            {label:'SIL Location',render:(r,e)=>e?eText('sil_visitor_checkins','silVisitors',r.id,'sil_location',r.sil_location):esc(r.sil_location||'—')},
-           {label:'Reason',render:(r,e)=>e?eText('sil_visitor_checkins','silVisitors',r.id,'reason_for_visit',r.reason_for_visit):esc(r.reason_for_visit||'—')},
+           {label:'Reason',render:(r,e)=>e?eText('sil_visitor_checkins','silVisitors',r.id,'reason_for_visit',r.reason_for_visit):esc(truncate(r.reason_for_visit)||'—')},
            {label:'Duration',render:(r,e)=>e?eText('sil_visitor_checkins','silVisitors',r.id,'duration',r.duration):esc(r.duration||'—')},
            {label:'Date/Time',render:r=>r.visit_at?new Date(r.visit_at).toLocaleString('en-AU'):'—'}]},
     {key:'feedbackSubs', title:'Feedback & Complaints', table:'feedback_submissions',
@@ -978,7 +997,7 @@ function silPage(){
            {label:'Pickup Date',render:(r,e)=>e?eText('medication_checks','medicationChecks',r.id,'pickup_date',r.pickup_date,{type:'date'}):fmtDate(r.pickup_date)}]},
     {key:'maintenanceRegister', title:'Ad Hoc Maintenance', table:'maintenance_register',
      cols:[{label:'Area / Asset',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'area_asset',r.area_asset):esc(r.area_asset||'—')},
-           {label:'Issue',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'issue_identified',r.issue_identified):esc(r.issue_identified||'—')},
+           {label:'Issue',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'issue_identified',r.issue_identified):esc(truncate(r.issue_identified)||'—')},
            {label:'Risk',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'risk_level',r.risk_level):badge(r.risk_level)},
            {label:'Responsible',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'responsible_person',r.responsible_person):esc(r.responsible_person||'—')},
            {label:'Date Identified',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'date_identified',r.date_identified,{type:'date'}):fmtDate(r.date_identified)}]},
@@ -987,7 +1006,7 @@ function silPage(){
     const editing = !!editState[s.key];
     const rows = state[s.key];
     const color = MONDAY_GROUP_COLORS[i % MONDAY_GROUP_COLORS.length];
-    return `<div class="panel sil-panel ${editing?'editing-mode':''}" style="--cat-color:${color}"><div class="panel-head"><h3><span class="cat-dot"></span>${s.title}</h3><div class="col-actions">${zoomControls('sil-'+s.key)}${editToggle(s.key)}</div></div>
+    return `<div class="panel sil-panel ${editing?'editing-mode':''}" style="--cat-color:${color}"><div class="panel-head"><h3><span class="cat-icon">${silCategoryIcon(s.key)}</span>${s.title}</h3><div class="col-actions">${zoomControls('sil-'+s.key)}${editToggle(s.key)}</div></div>
     ${!rows.length?'<div class="empty">No records yet.</div>':`<div class="table-wrap" data-resize-key="sil-${s.key}"><table class="table"><thead><tr>${s.cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr ${editing?'':`data-detail-table="${s.key}" data-detail-id="${r.id}"`} class="${editing?'':'clickable-check'}">${s.cols.map(c=>`<td>${c.render(r,editing)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
     </div>`;
   }).join('')}</div>`;
