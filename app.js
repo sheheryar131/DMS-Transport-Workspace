@@ -215,13 +215,30 @@ async function genericDeleteField(table,stateKey,key){
 
 function popOutField(el){
   if(el.tagName==='SELECT') return; // selects open their own dropdown, no need to pop
+  if(el.classList.contains('popped-field')) return; // already popped, avoid re-entering on the re-focus below
   const rect = el.getBoundingClientRect();
+  // Capture original position in the DOM so we can put it back exactly.
+  el._origParent = el.parentNode;
+  el._origNext = el.nextSibling;
+  el._origPlaceholder = document.createElement('span');
+  el._origPlaceholder.style.display = 'none';
+  el._origParent.insertBefore(el._origPlaceholder, el);
+  // Move the field itself out of the (possibly zoomed) table into document.body,
+  // so position:fixed coordinates are computed against the true viewport rather
+  // than a zoomed ancestor's coordinate space (which some browsers get wrong).
+  document.body.appendChild(el);
   el.classList.add('popped-field');
   el.style.left = rect.left+'px'; el.style.top = rect.top+'px'; el.style.width = Math.max(rect.width,220)+'px';
+  el.focus();
 }
 function unpopField(el){
   el.classList.remove('popped-field');
   el.style.left=''; el.style.top=''; el.style.width='';
+  if(el._origParent){
+    el._origParent.insertBefore(el, el._origPlaceholder);
+    el._origPlaceholder.remove();
+    el._origParent = null; el._origNext = null; el._origPlaceholder = null;
+  }
 }
 
 function zoomControls(key){
