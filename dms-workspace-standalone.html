@@ -363,6 +363,12 @@ th.col-removable:hover .col-del-x{opacity:1}
 .cat-icon{width:19px;height:19px;color:var(--cat-color);display:inline-flex;flex:0 0 auto}
 .cat-icon svg{width:100%;height:100%}
 
+/* ===== Mode switcher (DMS Transport / DMS Care) ===== */
+.mode-switcher{display:flex;gap:4px;background:rgba(0,0,0,.22);border-radius:10px;padding:4px;margin:0 4px 16px}
+.mode-tab{flex:1;border:0;background:transparent;color:#B9C6DE;padding:9px 6px;border-radius:7px;font-size:12.5px;font-weight:700;cursor:pointer;transition:all .15s var(--ease);white-space:nowrap}
+.mode-tab:hover{color:#fff;background:rgba(255,255,255,.08)}
+.mode-tab.active{background:var(--teal);color:#fff;box-shadow:0 3px 10px rgba(15,109,102,.35)}
+
   </style>
 </head>
 <body>
@@ -401,10 +407,13 @@ const navIcons = {
   sil:'<svg viewBox="0 0 24 24" class="ic" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>',
   integrations:'<svg viewBox="0 0 24 24" class="ic" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
 };
-const nav=[['dashboard','Dashboard'],['bookings','Master Bookings'],['checks','Daily Vehicle Checks'],['transfers','Transfer Forms'],['fleet','Fleet'],['stock','Stock'],['staff','Staff'],['astp','ASTP Compliance'],['incidents','Incidents'],['sil','SIL & Care'],['integrations','Automations']];
+const CARE_NAV=[['staff','Staff'],['incidents','Incidents'],['sil','SIL & Care']];
+const TRANSPORT_NAV=[['dashboard','Dashboard'],['bookings','Master Bookings'],['checks','Daily Vehicle Checks'],['transfers','Transfer Forms'],['fleet','Fleet'],['stock','Stock'],['astp','ASTP Compliance'],['integrations','Automations']];
+const MODE_DEFAULT_PAGE = {care:'sil', transport:'dashboard'};
+const MODE_LABEL = {care:'DMS Care', transport:'DMS Transport'};
 
 const state = {
-  current:'dashboard', loading:false, error:'',
+  current:'dashboard', appMode:'transport', loading:false, error:'',
   bookings:[], staff:[], vehicles:[], checks:[], transfers:[], incidents:[], stock:[], astp:[],
   orientation:[], silMaintenance:[], firstAid:[], silVisitors:[], notificationSettings:null,
   feedbackSubs:[], medicationChecks:[], maintenanceRegister:[],
@@ -482,11 +491,16 @@ async function refreshWithSplash(){
 
 function shell(body){
   const [title,sub] = pages[state.current];
+  const activeNav = state.appMode==='care' ? CARE_NAV : TRANSPORT_NAV;
   return `<div class="bg-blobs"></div><div class="app-shell"><aside class="sidebar">
     <div class="brand"><img class="brand-mark brand-logo" src="https://dmsassistedtransport.com.au/wp-content/uploads/2025/09/favicon-300x300.jpg" alt="DMS" onerror="this.outerHTML='<div class=&quot;brand-mark&quot;>D</div>'">DMS Workspace</div>
-    <div class="nav-section">Operations</div>
-    ${nav.map(([id,n])=>`<div class="nav-item ${id===state.current?'active':''}" data-page="${id}">${navIcons[id]}${n}</div>`).join('')}
-  </aside><main class="main"><header class="topbar"><strong>DMS Compliance</strong><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button><div class="user-chip"><div class="avatar">D</div><span>DMS Workspace</span></div></div></header>
+    <div class="mode-switcher">
+      <button class="mode-tab ${state.appMode==='transport'?'active':''}" data-mode="transport">🚐 DMS Transport</button>
+      <button class="mode-tab ${state.appMode==='care'?'active':''}" data-mode="care">🏠 DMS Care</button>
+    </div>
+    <div class="nav-section">${state.appMode==='care'?'Care':'Operations'}</div>
+    ${activeNav.map(([id,n])=>`<div class="nav-item ${id===state.current?'active':''}" data-page="${id}">${navIcons[id]}${n}</div>`).join('')}
+  </aside><main class="main"><header class="topbar"><strong>${MODE_LABEL[state.appMode]}</strong><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button><div class="user-chip"><div class="avatar">D</div><span>DMS Workspace</span></div></div></header>
   <div class="content"><div class="page-title"><div><h1>${title}</h1><p>${sub}</p></div>${state.current==='bookings'?'<button class="btn primary" id="newBookingBtn">+ New booking</button>':''}</div>
   ${state.error?`<div class="error-banner">${esc(state.error)}</div>`:''}${state.loading?'<div class="loading-bar">Loading live data…</div>':''}${body}</div></main></div>`;
 }
@@ -1395,6 +1409,11 @@ function render(){
   else body=integrations();
   app.innerHTML=shell(body);
   document.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>{state.current=x.dataset.page;render()});
+  document.querySelectorAll('[data-mode]').forEach(x=>x.onclick=()=>{
+    const m=x.dataset.mode;
+    if(m===state.appMode) return;
+    state.appMode=m; state.current=MODE_DEFAULT_PAGE[m]; render();
+  });
   document.querySelector('#refreshBtn').onclick=refreshWithSplash;
   document.querySelector('#newBookingBtn')?.addEventListener('click',newBookingModal);
   document.querySelectorAll('[data-detail-table]').forEach(tr=>tr.onclick=(e)=>{

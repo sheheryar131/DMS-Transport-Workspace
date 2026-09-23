@@ -351,3 +351,9 @@ th.col-removable:hover .col-del-x{opacity:1}
 .sil-panel .panel-head h3{display:flex;align-items:center;gap:9px}
 .cat-icon{width:19px;height:19px;color:var(--cat-color);display:inline-flex;flex:0 0 auto}
 .cat-icon svg{width:100%;height:100%}
+
+/* ===== Mode switcher (DMS Transport / DMS Care) ===== */
+.mode-switcher{display:flex;gap:4px;background:rgba(0,0,0,.22);border-radius:10px;padding:4px;margin:0 4px 16px}
+.mode-tab{flex:1;border:0;background:transparent;color:#B9C6DE;padding:9px 6px;border-radius:7px;font-size:12.5px;font-weight:700;cursor:pointer;transition:all .15s var(--ease);white-space:nowrap}
+.mode-tab:hover{color:#fff;background:rgba(255,255,255,.08)}
+.mode-tab.active{background:var(--teal);color:#fff;box-shadow:0 3px 10px rgba(15,109,102,.35)}
