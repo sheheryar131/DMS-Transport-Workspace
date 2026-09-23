@@ -1007,7 +1007,7 @@ function silPage(){
     const rows = state[s.key];
     const color = MONDAY_GROUP_COLORS[i % MONDAY_GROUP_COLORS.length];
     return `<div class="panel sil-panel ${editing?'editing-mode':''}" style="--cat-color:${color}"><div class="panel-head"><h3><span class="cat-icon">${silCategoryIcon(s.key)}</span>${s.title}</h3><div class="col-actions">${zoomControls('sil-'+s.key)}${editToggle(s.key)}</div></div>
-    ${!rows.length?'<div class="empty">No records yet.</div>':`<div class="table-wrap" data-resize-key="sil-${s.key}"><table class="table"><thead><tr>${s.cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr ${editing?'':`data-detail-table="${s.key}" data-detail-id="${r.id}"`} class="${editing?'':'clickable-check'}">${s.cols.map(c=>`<td>${c.render(r,editing)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
+    ${!rows.length?'<div class="empty">No records yet.</div>':`<div class="table-wrap" data-resize-key="sil-${s.key}"><table class="table"><thead><tr>${s.cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}${editing?'<th></th>':''}</tr></thead><tbody>${rows.map(r=>`<tr ${editing?'':`data-detail-table="${s.key}" data-detail-id="${r.id}"`} class="${editing?'':'clickable-check'}">${s.cols.map(c=>`<td>${c.render(r,editing)}</td>`).join('')}${editing?`<td><button class="btn small danger" data-del-row="${s.table}|${s.key}|${r.id}">Del</button></td>`:''}</tr>`).join('')}</tbody></table></div>`}
     </div>`;
   }).join('')}</div>`;
 }
@@ -1303,6 +1303,7 @@ function complianceBadge(row){
 
 
 
+const DETAIL_TABLE_MAP = {checks:'vehicle_checks',transfers:'transfer_logs',incidents:'incidents',orientation:'orientation_checklists',silMaintenance:'sil_maintenance_checks',firstAid:'first_aid_checks',silVisitors:'sil_visitor_checkins',bookings:'bookings',feedbackSubs:'feedback_submissions',medicationChecks:'medication_checks',maintenanceRegister:'maintenance_register'};
 function genericDetailModal(table,id){
   const source={checks:state.checks,transfers:state.transfers,incidents:state.incidents,orientation:state.orientation,silMaintenance:state.silMaintenance,firstAid:state.firstAid,silVisitors:state.silVisitors,bookings:state.bookings,feedbackSubs:state.feedbackSubs,medicationChecks:state.medicationChecks,maintenanceRegister:state.maintenanceRegister}[table]||[];
   const row=source.find(x=>x.id===id); if(!row)return;
@@ -1314,10 +1315,19 @@ function genericDetailModal(table,id){
   })() : '';
   const rows=Object.keys(p).filter(k=>!SYSTEM_KEYS.has(k))
     .map(k=>`<div class="answer-row"><div class="answer-label">${esc(fieldLabel(k))}</div><div class="answer-value">${renderPayloadValue(k,p[k])}</div></div>`).join('')||'<div class="empty">No detailed submission payload stored for this record.</div>';
-  document.body.insertAdjacentHTML('beforeend',`<div class="compliance-modal-backdrop" id="genericDetailModal"><div class="compliance-modal"><div class="compliance-head"><div><h3>${titles[table]||'Submission'}</h3></div><button id="closeGenericDetail">×</button></div><div class="compliance-body">${issueSummary}<div class="answers-title">Complete submission</div>${rows}</div></div></div>`);
+  document.body.insertAdjacentHTML('beforeend',`<div class="compliance-modal-backdrop" id="genericDetailModal"><div class="compliance-modal"><div class="compliance-head"><div><h3>${titles[table]||'Submission'}</h3></div><button id="closeGenericDetail">×</button></div><div class="compliance-body">${issueSummary}<div class="answers-title">Complete submission</div>${rows}</div><div class="modal-actions" style="padding:14px 22px 20px"><button class="btn danger" id="deleteDetailRow">🗑 Delete this record</button></div></div></div>`);
   const close=()=>document.querySelector('#genericDetailModal')?.remove();
   document.querySelector('#closeGenericDetail').onclick=close;
   document.querySelector('#genericDetailModal').onclick=e=>{if(e.target.id==='genericDetailModal')close();};
+  document.querySelector('#deleteDetailRow').onclick=async()=>{
+    const realTable = DETAIL_TABLE_MAP[table];
+    if(!realTable){alert('Cannot delete: unknown table.');return;}
+    if(!confirm('Delete this record? This cannot be undone.')) return;
+    const {error} = await supabase.from(realTable).delete().eq('id',id);
+    if(error){alert('Could not delete: '+error.message);return;}
+    state[table] = state[table].filter(r=>r.id!==id);
+    close(); render();
+  };
 }
 
 /* ===================== Integrations ===================== */
