@@ -124,7 +124,7 @@ function shell(body){
     </div>
     <div class="nav-section">${state.appMode==='care'?'Care':'Operations'}</div>
     ${activeNav.map(([id,n])=>`<div class="nav-item ${id===state.current?'active':''}" data-page="${id}">${navIcons[id]}${n}</div>`).join('')}
-  </aside><main class="main"><header class="topbar"><strong>${MODE_LABEL[state.appMode]}</strong><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button><div class="user-chip"><div class="avatar">D</div><span>DMS Workspace</span></div></div></header>
+  </aside><main class="main"><header class="topbar"><span class="topbar-label">${state.appMode==='care'?'🏠':'🚐'} ${MODE_LABEL[state.appMode]}</span><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button><div class="user-chip"><div class="avatar">D</div><span>DMS Workspace</span></div></div></header>
   <div class="content"><div class="page-title"><div><h1>${title}</h1><p>${sub}</p></div>${state.current==='bookings'?'<button class="btn primary" id="newBookingBtn">+ New booking</button>':''}</div>
   ${state.error?`<div class="error-banner">${esc(state.error)}</div>`:''}${state.loading?'<div class="loading-bar">Loading live data…</div>':''}${body}</div></main></div>`;
 }
