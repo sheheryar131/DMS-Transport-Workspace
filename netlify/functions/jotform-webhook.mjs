@@ -222,7 +222,7 @@ function mapOrientation(payload, formId, submissionId) {
   return {
     source_form_id: formId,
     source_submission_id: submissionId,
-    participant_name: field(payload, 'Full Name') || text(findCiSuffix(payload, 'fullName')),
+    participant_name: field(payload, 'Full Name') || text(findCiSuffix(payload, 'fullName')) || text(findExactSuffix(payload, 'typeA')),
     sil_location: field(payload, 'SIL Location') || text(findCiSuffix(payload, 'silLocation')) || text(findExactSuffix(payload, 'typeA63')),
     support_worker_name: field(payload, 'Support Worker') || text(findCiSuffix(payload, 'supportWorker')),
     trainer_name: field(payload, 'Trainer') || text(findCiSuffix(payload, 'trainer')),
