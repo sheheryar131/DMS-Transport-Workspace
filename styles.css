@@ -357,3 +357,16 @@ th.col-removable:hover .col-del-x{opacity:1}
 .mode-tab{flex:1;border:0;background:transparent;color:#B9C6DE;padding:9px 6px;border-radius:7px;font-size:12.5px;font-weight:700;cursor:pointer;transition:all .15s var(--ease);white-space:nowrap}
 .mode-tab:hover{color:#fff;background:rgba(255,255,255,.08)}
 .mode-tab.active{background:var(--teal);color:#fff;box-shadow:0 3px 10px rgba(15,109,102,.35)}
+
+/* ===== SIL & Care tab bar ===== */
+.sil-tabbar{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:16px;-webkit-overflow-scrolling:touch}
+.sil-tab{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;border:1.5px solid var(--line);background:var(--surface);border-radius:11px;padding:10px 15px;font-size:13px;font-weight:700;color:var(--ink-soft);cursor:pointer;transition:all .18s var(--ease);position:relative;flex:0 0 auto}
+.sil-tab .cat-icon{color:var(--cat-color)}
+.sil-tab:hover{border-color:var(--cat-color);transform:translateY(-2px);box-shadow:0 6px 16px rgba(20,30,50,.1)}
+.sil-tab.active{background:var(--cat-color);border-color:var(--cat-color);color:#fff}
+.sil-tab.active .cat-icon{color:#fff}
+.sil-tab.active .sil-tab-count{background:rgba(255,255,255,.28);color:#fff}
+.sil-tab-count{background:var(--surface-2);color:var(--muted);border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;transition:all .18s var(--ease)}
+.sil-tab-content{animation:silTabIn .3s var(--ease)}
+@keyframes silTabIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media(max-width:760px){.sil-tabbar{margin:0 -14px 16px;padding:0 14px 4px}}

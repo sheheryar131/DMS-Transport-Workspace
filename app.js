@@ -37,7 +37,7 @@ const MODE_DEFAULT_PAGE = {care:'sil', transport:'dashboard'};
 const MODE_LABEL = {care:'DMS Care', transport:'DMS Transport'};
 
 const state = {
-  current:'dashboard', appMode:'transport', loading:false, error:'',
+  current:'dashboard', appMode:'transport', silActiveTab:'orientation', loading:false, error:'',
   bookings:[], staff:[], vehicles:[], checks:[], transfers:[], incidents:[], stock:[], astp:[],
   orientation:[], silMaintenance:[], firstAid:[], silVisitors:[], notificationSettings:null,
   feedbackSubs:[], medicationChecks:[], maintenanceRegister:[],
@@ -640,14 +640,21 @@ function silPage(){
            {label:'Responsible',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'responsible_person',r.responsible_person):esc(r.responsible_person||'—')},
            {label:'Date Identified',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'date_identified',r.date_identified,{type:'date'}):fmtDate(r.date_identified)}]},
   ];
-  return `<div class="grid-2">${sub.map((s,i)=>{
-    const editing = !!editState[s.key];
-    const rows = state[s.key];
+  const activeIdx = sub.findIndex(s=>s.key===(state.silActiveTab||'orientation'));
+  const activeI = activeIdx===-1?0:activeIdx;
+  const active = sub[activeI];
+  const activeColor = MONDAY_GROUP_COLORS[activeI % MONDAY_GROUP_COLORS.length];
+  const editing = !!editState[active.key];
+  const rows = state[active.key];
+  return `<div class="sil-tabbar">${sub.map((s,i)=>{
     const color = MONDAY_GROUP_COLORS[i % MONDAY_GROUP_COLORS.length];
-    return `<div class="panel sil-panel ${editing?'editing-mode':''}" style="--cat-color:${color}"><div class="panel-head"><h3><span class="cat-icon">${silCategoryIcon(s.key)}</span>${s.title}</h3><div class="col-actions">${zoomControls('sil-'+s.key)}${editToggle(s.key)}</div></div>
-    ${!rows.length?'<div class="empty">No records yet.</div>':`<div class="table-wrap" data-resize-key="sil-${s.key}"><table class="table"><thead><tr>${s.cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}${editing?'<th></th>':''}</tr></thead><tbody>${rows.map(r=>`<tr ${editing?'':`data-detail-table="${s.key}" data-detail-id="${r.id}"`} class="${editing?'':'clickable-check'}">${s.cols.map(c=>`<td>${c.render(r,editing)}</td>`).join('')}${editing?`<td><button class="btn small danger" data-del-row="${s.table}|${s.key}|${r.id}">Del</button></td>`:''}</tr>`).join('')}</tbody></table></div>`}
-    </div>`;
-  }).join('')}</div>`;
+    const count = (state[s.key]||[]).length;
+    return `<button class="sil-tab ${s.key===active.key?'active':''}" style="--cat-color:${color}" data-sil-tab="${s.key}"><span class="cat-icon">${silCategoryIcon(s.key)}</span>${s.title}<span class="sil-tab-count">${count}</span></button>`;
+  }).join('')}</div>
+  <div class="panel sil-panel sil-tab-content ${editing?'editing-mode':''}" style="--cat-color:${activeColor}">
+    <div class="panel-head"><h3><span class="cat-icon">${silCategoryIcon(active.key)}</span>${active.title}</h3><div class="col-actions">${zoomControls('sil-'+active.key)}${editToggle(active.key)}</div></div>
+    ${!rows.length?'<div class="empty">No records yet.</div>':`<div class="table-wrap" data-resize-key="sil-${active.key}"><table class="table"><thead><tr>${active.cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}${editing?'<th></th>':''}</tr></thead><tbody>${rows.map(r=>`<tr ${editing?'':`data-detail-table="${active.key}" data-detail-id="${r.id}"`} class="${editing?'':'clickable-check'}">${active.cols.map(c=>`<td>${c.render(r,editing)}</td>`).join('')}${editing?`<td><button class="btn small danger" data-del-row="${active.table}|${active.key}|${r.id}">Del</button></td>`:''}</tr>`).join('')}</tbody></table></div>`}
+  </div>`;
 }
 
 /* ===================== Fleet ===================== */
@@ -1038,6 +1045,7 @@ function render(){
     if(m===state.appMode) return;
     state.appMode=m; state.current=MODE_DEFAULT_PAGE[m]; render();
   });
+  document.querySelectorAll('[data-sil-tab]').forEach(x=>x.onclick=()=>{state.silActiveTab=x.dataset.silTab;render();});
   document.querySelector('#refreshBtn').onclick=refreshWithSplash;
   document.querySelector('#newBookingBtn')?.addEventListener('click',newBookingModal);
   document.querySelectorAll('[data-detail-table]').forEach(tr=>tr.onclick=(e)=>{
