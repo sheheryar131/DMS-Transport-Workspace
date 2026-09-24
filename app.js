@@ -1232,6 +1232,9 @@ async function approveUser(id){
 }
 
 function profileMenu(){
+  if(!state.session){
+    return `<div class="user-chip"><div class="avatar">D</div><span>DMS Workspace</span></div>`;
+  }
   const p = state.profile;
   const name = p?.first_name ? `${p.first_name} ${p.last_name||''}`.trim() : (state.session?.user?.email||'Account');
   const initials = (p?.first_name?.[0]||state.session?.user?.email?.[0]||'?').toUpperCase();
@@ -1282,30 +1285,8 @@ function pendingApprovalScreen(){
 }
 
 async function bootApp(){
-  const {data:{session}} = await supabase.auth.getSession();
-  state.session = session;
-  supabase.auth.onAuthStateChange(async (event,newSession)=>{
-    if(event==='PASSWORD_RECOVERY'){
-      state.session=newSession; state.authView='reset'; renderAuth(); return;
-    }
-    state.session = newSession;
-    if(newSession){
-      await loadProfile();
-      if(!state.profile?.approved){ app.innerHTML=pendingApprovalScreen(); document.querySelector('#pendingLogoutBtn')?.addEventListener('click',()=>supabase.auth.signOut()); return; }
-      await loadPendingProfiles();
-      firstLoad=true; loadData();
-    } else {
-      state.profile=null; state.authView='login'; state.authMessage=''; state.authError=''; renderAuth();
-    }
-  });
-  if(session){
-    await loadProfile();
-    if(!state.profile?.approved){ app.innerHTML=pendingApprovalScreen(); document.querySelector('#pendingLogoutBtn')?.addEventListener('click',()=>supabase.auth.signOut()); return; }
-    await loadPendingProfiles();
-    loadData();
-  } else {
-    renderAuth();
-  }
+  // Auth temporarily disabled — loading straight in, no login required.
+  loadData();
 }
 
 bootApp();
