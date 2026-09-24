@@ -1571,11 +1571,20 @@ function renderAuth(){
   document.querySelector('#signupForm')?.addEventListener('submit',async e=>{
     e.preventDefault(); state.authError='';
     const f=Object.fromEntries(new FormData(e.target));
-    const {error}=await supabase.auth.signUp({
+    const {data,error}=await supabase.auth.signUp({
       email:f.email, password:f.password,
       options:{data:{first_name:f.first_name,last_name:f.last_name}, emailRedirectTo:window.location.origin}
     });
     if(error){state.authError=error.message;renderAuth();return;}
+    // Notify the admin directly (Supabase Database Webhooks aren't available on this project),
+    // matching the same payload shape the function expects.
+    if(data?.user?.id){
+      fetch('/.netlify/functions/notify-signup',{
+        method:'POST',
+        headers:{'content-type':'application/json','x-webhook-secret':'29b545104d54fe607afe6f0b6a5f73cd'},
+        body:JSON.stringify({record:{id:data.user.id, first_name:f.first_name, last_name:f.last_name}})
+      }).catch(()=>{});
+    }
     state.authView='login'; state.authMessage="Account created! An admin has been notified and will approve your access shortly — you'll be able to log in once approved."; renderAuth();
   });
 
@@ -1610,8 +1619,15 @@ async function loadPendingProfiles(){
 }
 
 async function approveUser(id){
+  const target = state.pendingProfiles.find(p=>p.id===id);
   const {error} = await supabase.from('profiles').update({approved:true}).eq('id',id);
   if(error){alert('Could not approve: '+error.message);return;}
+  // Same direct-call approach as signup — Database Webhooks aren't available on this project.
+  fetch('/.netlify/functions/notify-approved',{
+    method:'POST',
+    headers:{'content-type':'application/json','x-webhook-secret':'29b545104d54fe607afe6f0b6a5f73cd'},
+    body:JSON.stringify({record:{id, first_name:target?.first_name, approved:true}, old_record:{approved:false}})
+  }).catch(()=>{});
   await loadPendingProfiles(); render();
 }
 
