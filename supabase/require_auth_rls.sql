@@ -17,6 +17,7 @@ begin
   foreach t in array tables loop
     if to_regclass('public.'||t) is not null then
       execute format('drop policy if exists "anon_full_access" on public.%I', t);
+      execute format('drop policy if exists "authenticated_full_access" on public.%I', t);
       execute format('create policy "authenticated_full_access" on public.%I for all using (auth.uid() is not null) with check (auth.uid() is not null)', t);
     end if;
   end loop;
