@@ -217,7 +217,11 @@ function popOutField(el){
   if(el.tagName==='SELECT') return; // selects open their own dropdown, no need to pop
   const rect = el.getBoundingClientRect();
   el.classList.add('popped-field');
-  el.style.left = rect.left+'px'; el.style.top = rect.top+'px'; el.style.width = Math.max(rect.width,220)+'px';
+  el.style.left = rect.left+'px'; el.style.top = rect.top+'px';
+  // Size to the actual content (not a flat oversized minimum) so narrow columns
+  // don't balloon out over neighboring ones — just enough to show full text.
+  const contentWidth = (String(el.value||'').length * 7.5) + 34;
+  el.style.width = Math.max(rect.width, Math.min(contentWidth, 260))+'px';
 }
 function unpopField(el){
   el.classList.remove('popped-field');
