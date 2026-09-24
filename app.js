@@ -42,7 +42,7 @@ const state = {
   orientation:[], silMaintenance:[], firstAid:[], silVisitors:[], notificationSettings:null,
   feedbackSubs:[], medicationChecks:[], maintenanceRegister:[],
   bookingsShowAll:false, expiryAlertExpanded:false,
-  session:null, profile:null, authView:'login', authMessage:'', authError:'', profileMenuOpen:false
+  session:null, profile:null, authView:'login', authMessage:'', authError:'', profileMenuOpen:false, pendingProfiles:[]
 };
 const editState = {}; // pageKey -> boolean, tracks per-tab edit mode
 
@@ -1073,6 +1073,7 @@ function render(){
   document.querySelector('#logoutBtn')?.addEventListener('click',async()=>{
     await supabase.auth.signOut();
   });
+  document.querySelectorAll('[data-approve-user]').forEach(btn=>btn.onclick=()=>approveUser(btn.dataset.approveUser));
   document.querySelector('#newBookingBtn')?.addEventListener('click',newBookingModal);
   document.querySelectorAll('[data-detail-table]').forEach(tr=>tr.onclick=(e)=>{
     if(['INPUT','SELECT','BUTTON','A','TEXTAREA'].includes(e.target.tagName)) return;
@@ -1175,7 +1176,7 @@ function renderAuth(){
       options:{data:{first_name:f.first_name,last_name:f.last_name}, emailRedirectTo:window.location.origin}
     });
     if(error){state.authError=error.message;renderAuth();return;}
-    state.authView='login'; state.authMessage='Account created! Check your email to verify it, then log in.'; renderAuth();
+    state.authView='login'; state.authMessage="Account created! An admin has been notified and will approve your access shortly — you'll be able to log in once approved."; renderAuth();
   });
 
   document.querySelector('#forgotForm')?.addEventListener('submit',async e=>{
@@ -1202,14 +1203,28 @@ async function loadProfile(){
   state.profile = data;
 }
 
+async function loadPendingProfiles(){
+  if(!state.session || !state.profile?.approved) { state.pendingProfiles=[]; return; }
+  const {data} = await supabase.from('profiles').select('*').eq('approved',false).neq('id',state.session.user.id);
+  state.pendingProfiles = data||[];
+}
+
+async function approveUser(id){
+  const {error} = await supabase.from('profiles').update({approved:true}).eq('id',id);
+  if(error){alert('Could not approve: '+error.message);return;}
+  await loadPendingProfiles(); render();
+}
+
 function profileMenu(){
   const p = state.profile;
   const name = p?.first_name ? `${p.first_name} ${p.last_name||''}`.trim() : (state.session?.user?.email||'Account');
   const initials = (p?.first_name?.[0]||state.session?.user?.email?.[0]||'?').toUpperCase();
+  const pending = state.pendingProfiles||[];
   return `<div class="profile-menu-wrap">
-    <button class="user-chip" id="profileMenuBtn" style="border:0;background:none;cursor:pointer">
+    <button class="user-chip" id="profileMenuBtn" style="border:0;background:none;cursor:pointer;position:relative">
       ${p?.avatar_url?`<img src="${esc(p.avatar_url)}" class="avatar" style="object-fit:cover">`:`<div class="avatar">${esc(initials)}</div>`}
       <span>${esc(p?.first_name||name)}</span>
+      ${pending.length?`<span class="pending-badge">${pending.length}</span>`:''}
     </button>
     ${state.profileMenuOpen?`<div class="profile-dropdown">
       <div class="profile-dropdown-head">
@@ -1223,6 +1238,10 @@ function profileMenu(){
         <input type="text" name="last_name" placeholder="Last name" value="${esc(p?.last_name||'')}" style="border:1px solid var(--line);border-radius:8px;padding:8px 10px">
         <button class="btn primary small full" type="submit">Save changes</button>
       </form>
+      ${pending.length?`<div class="pending-approvals">
+        <div class="answers-title" style="margin:14px 0 8px">Pending approvals (${pending.length})</div>
+        ${pending.map(u=>`<div class="pending-row"><span>${esc(u.first_name||'')} ${esc(u.last_name||'')}</span><button class="btn small primary" data-approve-user="${u.id}">Approve</button></div>`).join('')}
+      </div>`:''}
       <button class="btn small full" id="logoutBtn" style="margin-top:10px;color:var(--danger);border-color:var(--danger-tint)">Log out</button>
     </div>`:''}
   </div>`;
@@ -1239,6 +1258,13 @@ async function handleAvatarUpload(file){
   await loadProfile(); render();
 }
 
+function pendingApprovalScreen(){
+  return authShell(`<h1>Almost there</h1>
+    <p>Your account (${esc(state.session?.user?.email||'')}) is waiting for admin approval.</p>
+    <p class="auth-message">You'll be able to log in the moment an admin approves your access. If you know who that is, feel free to give them a nudge.</p>
+    <button class="btn full" id="pendingLogoutBtn">Log out</button>`);
+}
+
 async function bootApp(){
   const {data:{session}} = await supabase.auth.getSession();
   state.session = session;
@@ -1249,6 +1275,8 @@ async function bootApp(){
     state.session = newSession;
     if(newSession){
       await loadProfile();
+      if(!state.profile?.approved){ app.innerHTML=pendingApprovalScreen(); document.querySelector('#pendingLogoutBtn')?.addEventListener('click',()=>supabase.auth.signOut()); return; }
+      await loadPendingProfiles();
       firstLoad=true; loadData();
     } else {
       state.profile=null; state.authView='login'; state.authMessage=''; state.authError=''; renderAuth();
@@ -1256,6 +1284,8 @@ async function bootApp(){
   });
   if(session){
     await loadProfile();
+    if(!state.profile?.approved){ app.innerHTML=pendingApprovalScreen(); document.querySelector('#pendingLogoutBtn')?.addEventListener('click',()=>supabase.auth.signOut()); return; }
+    await loadPendingProfiles();
     loadData();
   } else {
     renderAuth();

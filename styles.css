@@ -376,3 +376,8 @@ th.col-removable:hover .col-del-x{opacity:1}
 .profile-menu-wrap{position:relative}
 .profile-dropdown{position:absolute;top:calc(100% + 10px);right:0;width:260px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:16px;z-index:60;animation:panelIn .18s var(--ease)}
 .profile-dropdown-head{display:flex;align-items:center;gap:11px;padding-bottom:12px;border-bottom:1px solid var(--line-soft)}
+
+/* ===== Pending approvals ===== */
+.pending-badge{position:absolute;top:2px;right:-4px;background:var(--danger);color:#fff;font-size:10px;font-weight:800;min-width:16px;height:16px;border-radius:999px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.pending-approvals{border-top:1px solid var(--line-soft);padding-top:8px}
+.pending-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;font-size:13px}
