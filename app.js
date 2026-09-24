@@ -41,7 +41,8 @@ const state = {
   bookings:[], staff:[], vehicles:[], checks:[], transfers:[], incidents:[], stock:[], astp:[],
   orientation:[], silMaintenance:[], firstAid:[], silVisitors:[], notificationSettings:null,
   feedbackSubs:[], medicationChecks:[], maintenanceRegister:[],
-  bookingsShowAll:false, expiryAlertExpanded:false
+  bookingsShowAll:false, expiryAlertExpanded:false,
+  session:null, profile:null, authView:'login', authMessage:'', authError:'', profileMenuOpen:false
 };
 const editState = {}; // pageKey -> boolean, tracks per-tab edit mode
 
@@ -124,7 +125,7 @@ function shell(body){
     </div>
     <div class="nav-section">${state.appMode==='care'?'Care':'Operations'}</div>
     ${activeNav.map(([id,n])=>`<div class="nav-item ${id===state.current?'active':''}" data-page="${id}">${navIcons[id]}${n}</div>`).join('')}
-  </aside><main class="main"><header class="topbar"><span class="topbar-label">${state.appMode==='care'?'🏠':'🚐'} ${MODE_LABEL[state.appMode]}</span><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button><div class="user-chip"><div class="avatar">D</div><span>DMS Workspace</span></div></div></header>
+  </aside><main class="main"><header class="topbar"><span class="topbar-label">${state.appMode==='care'?'🏠':'🚐'} ${MODE_LABEL[state.appMode]}</span><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button>${profileMenu()}</div></header>
   <div class="content"><div class="page-title"><div><h1>${title}</h1><p>${sub}</p></div>${state.current==='bookings'?'<button class="btn primary" id="newBookingBtn">+ New booking</button>':''}</div>
   ${state.error?`<div class="error-banner">${esc(state.error)}</div>`:''}${state.loading?'<div class="loading-bar">Loading live data…</div>':''}${body}</div></main></div>`;
 }
@@ -1055,6 +1056,23 @@ function render(){
   });
   document.querySelectorAll('[data-sil-tab]').forEach(x=>x.onclick=()=>{state.silActiveTab=x.dataset.silTab;render();});
   document.querySelector('#refreshBtn').onclick=refreshWithSplash;
+  document.querySelector('#profileMenuBtn')?.addEventListener('click',(e)=>{e.stopPropagation();state.profileMenuOpen=!state.profileMenuOpen;render();});
+  if(state.profileMenuOpen){
+    document.addEventListener('click',function closeProfileMenu(e){
+      if(!e.target.closest('.profile-menu-wrap')){state.profileMenuOpen=false;document.removeEventListener('click',closeProfileMenu);render();}
+    });
+  }
+  document.querySelector('#avatarUpload')?.addEventListener('change',e=>handleAvatarUpload(e.target.files[0]));
+  document.querySelector('#profileEditForm')?.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const f=Object.fromEntries(new FormData(e.target));
+    const {error}=await supabase.from('profiles').update({first_name:f.first_name,last_name:f.last_name}).eq('id',state.session.user.id);
+    if(error){alert('Could not save: '+error.message);return;}
+    await loadProfile(); state.profileMenuOpen=false; render();
+  });
+  document.querySelector('#logoutBtn')?.addEventListener('click',async()=>{
+    await supabase.auth.signOut();
+  });
   document.querySelector('#newBookingBtn')?.addEventListener('click',newBookingModal);
   document.querySelectorAll('[data-detail-table]').forEach(tr=>tr.onclick=(e)=>{
     if(['INPUT','SELECT','BUTTON','A','TEXTAREA'].includes(e.target.tagName)) return;
@@ -1071,4 +1089,177 @@ function render(){
   wireColumnDrag();
 }
 
-loadData();
+/* ===================== Authentication ===================== */
+
+function authShell(inner){
+  return `<div class="auth-shell"><div class="auth-card">
+    <div class="auth-brand"><img class="brand-mark brand-logo" style="width:48px;height:48px" src="https://dmsassistedtransport.com.au/wp-content/uploads/2025/09/favicon-300x300.jpg" alt="DMS" onerror="this.style.display='none'"><div><strong>DMS Workspace</strong><small>Disability Mobility and Services</small></div></div>
+    ${inner}
+  </div></div>`;
+}
+
+function authScreen(){
+  if(state.authView==='signup') return authShell(signupForm());
+  if(state.authView==='forgot') return authShell(forgotForm());
+  if(state.authView==='reset') return authShell(resetForm());
+  return authShell(loginForm());
+}
+
+function loginForm(){
+  return `<h1>Welcome back</h1><p>Log in to your DMS Workspace account.</p>
+  ${state.authMessage?`<p class="auth-message">${esc(state.authMessage)}</p>`:''}
+  ${state.authError?`<p class="auth-message" style="background:var(--danger-tint);color:var(--danger)">${esc(state.authError)}</p>`:''}
+  <form id="loginForm" class="auth-form">
+    <label>Email<input type="email" name="email" required autocomplete="email"></label>
+    <label>Password<input type="password" name="password" required autocomplete="current-password"></label>
+    <button class="btn primary full" type="submit">Log in</button>
+    <button type="button" class="text-btn" id="gotoForgot">Forgot your password?</button>
+  </form>
+  <div class="auth-foot">Don't have an account yet? <button type="button" class="text-btn" style="padding:0" id="gotoSignup">Sign up</button> — limited to 5 team members.</div>`;
+}
+
+function signupForm(){
+  return `<h1>Create your account</h1><p>Sign up for DMS Workspace access.</p>
+  ${state.authError?`<p class="auth-message" style="background:var(--danger-tint);color:var(--danger)">${esc(state.authError)}</p>`:''}
+  <form id="signupForm" class="auth-form">
+    <label>First name<input type="text" name="first_name" required autocomplete="given-name"></label>
+    <label>Last name<input type="text" name="last_name" required autocomplete="family-name"></label>
+    <label>Email<input type="email" name="email" required autocomplete="email"></label>
+    <label>Password<input type="password" name="password" required minlength="6" autocomplete="new-password"></label>
+    <button class="btn primary full" type="submit">Sign up</button>
+  </form>
+  <div class="auth-foot">Already have an account? <button type="button" class="text-btn" style="padding:0" id="gotoLogin">Log in</button></div>`;
+}
+
+function forgotForm(){
+  return `<h1>Reset your password</h1><p>We'll email you a link to set a new password.</p>
+  ${state.authMessage?`<p class="auth-message">${esc(state.authMessage)}</p>`:''}
+  ${state.authError?`<p class="auth-message" style="background:var(--danger-tint);color:var(--danger)">${esc(state.authError)}</p>`:''}
+  <form id="forgotForm" class="auth-form">
+    <label>Email<input type="email" name="email" required autocomplete="email"></label>
+    <button class="btn primary full" type="submit">Send reset link</button>
+  </form>
+  <div class="auth-foot"><button type="button" class="text-btn" style="padding:0" id="gotoLogin2">Back to log in</button></div>`;
+}
+
+function resetForm(){
+  return `<h1>Set a new password</h1><p>Choose a new password for your account.</p>
+  ${state.authError?`<p class="auth-message" style="background:var(--danger-tint);color:var(--danger)">${esc(state.authError)}</p>`:''}
+  <form id="resetForm" class="auth-form">
+    <label>New password<input type="password" name="password" required minlength="6" autocomplete="new-password"></label>
+    <label>Confirm new password<input type="password" name="password2" required minlength="6" autocomplete="new-password"></label>
+    <button class="btn primary full" type="submit">Set new password</button>
+  </form>`;
+}
+
+function renderAuth(){
+  app.innerHTML = authScreen();
+  document.querySelector('#gotoSignup')?.addEventListener('click',()=>{state.authView='signup';state.authError='';renderAuth();});
+  document.querySelector('#gotoLogin')?.addEventListener('click',()=>{state.authView='login';state.authError='';renderAuth();});
+  document.querySelector('#gotoLogin2')?.addEventListener('click',()=>{state.authView='login';state.authError='';state.authMessage='';renderAuth();});
+  document.querySelector('#gotoForgot')?.addEventListener('click',()=>{state.authView='forgot';state.authError='';renderAuth();});
+
+  document.querySelector('#loginForm')?.addEventListener('submit',async e=>{
+    e.preventDefault(); state.authError='';
+    const f=Object.fromEntries(new FormData(e.target));
+    const {error}=await supabase.auth.signInWithPassword({email:f.email,password:f.password});
+    if(error){state.authError=error.message;renderAuth();return;}
+    // onAuthStateChange handles moving into the app
+  });
+
+  document.querySelector('#signupForm')?.addEventListener('submit',async e=>{
+    e.preventDefault(); state.authError='';
+    const f=Object.fromEntries(new FormData(e.target));
+    const {error}=await supabase.auth.signUp({
+      email:f.email, password:f.password,
+      options:{data:{first_name:f.first_name,last_name:f.last_name}, emailRedirectTo:window.location.origin}
+    });
+    if(error){state.authError=error.message;renderAuth();return;}
+    state.authView='login'; state.authMessage='Account created! Check your email to verify it, then log in.'; renderAuth();
+  });
+
+  document.querySelector('#forgotForm')?.addEventListener('submit',async e=>{
+    e.preventDefault(); state.authError='';
+    const f=Object.fromEntries(new FormData(e.target));
+    const {error}=await supabase.auth.resetPasswordForEmail(f.email,{redirectTo:window.location.origin});
+    if(error){state.authError=error.message;renderAuth();return;}
+    state.authMessage='Check your email for a password reset link.'; renderAuth();
+  });
+
+  document.querySelector('#resetForm')?.addEventListener('submit',async e=>{
+    e.preventDefault(); state.authError='';
+    const f=Object.fromEntries(new FormData(e.target));
+    if(f.password!==f.password2){state.authError='Passwords do not match.';renderAuth();return;}
+    const {error}=await supabase.auth.updateUser({password:f.password});
+    if(error){state.authError=error.message;renderAuth();return;}
+    state.authView='login'; state.authMessage='Password updated. Log in with your new password.'; renderAuth();
+  });
+}
+
+async function loadProfile(){
+  if(!state.session) return;
+  const {data} = await supabase.from('profiles').select('*').eq('id',state.session.user.id).maybeSingle();
+  state.profile = data;
+}
+
+function profileMenu(){
+  const p = state.profile;
+  const name = p?.first_name ? `${p.first_name} ${p.last_name||''}`.trim() : (state.session?.user?.email||'Account');
+  const initials = (p?.first_name?.[0]||state.session?.user?.email?.[0]||'?').toUpperCase();
+  return `<div class="profile-menu-wrap">
+    <button class="user-chip" id="profileMenuBtn" style="border:0;background:none;cursor:pointer">
+      ${p?.avatar_url?`<img src="${esc(p.avatar_url)}" class="avatar" style="object-fit:cover">`:`<div class="avatar">${esc(initials)}</div>`}
+      <span>${esc(p?.first_name||name)}</span>
+    </button>
+    ${state.profileMenuOpen?`<div class="profile-dropdown">
+      <div class="profile-dropdown-head">
+        ${p?.avatar_url?`<img src="${esc(p.avatar_url)}" class="avatar" style="width:44px;height:44px;object-fit:cover">`:`<div class="avatar" style="width:44px;height:44px;font-size:16px">${esc(initials)}</div>`}
+        <div><strong>${esc(name)}</strong><br><span class="muted" style="font-size:12px">${esc(state.session?.user?.email||'')}</span></div>
+      </div>
+      <label class="btn small full" style="cursor:pointer;margin:10px 0 4px" for="avatarUpload">📷 Change photo</label>
+      <input type="file" id="avatarUpload" accept="image/*" style="display:none">
+      <form id="profileEditForm" style="display:grid;gap:8px;margin-top:6px">
+        <input type="text" name="first_name" placeholder="First name" value="${esc(p?.first_name||'')}" required style="border:1px solid var(--line);border-radius:8px;padding:8px 10px">
+        <input type="text" name="last_name" placeholder="Last name" value="${esc(p?.last_name||'')}" style="border:1px solid var(--line);border-radius:8px;padding:8px 10px">
+        <button class="btn primary small full" type="submit">Save changes</button>
+      </form>
+      <button class="btn small full" id="logoutBtn" style="margin-top:10px;color:var(--danger);border-color:var(--danger-tint)">Log out</button>
+    </div>`:''}
+  </div>`;
+}
+
+async function handleAvatarUpload(file){
+  if(!file || !state.session) return;
+  const path = `${state.session.user.id}/avatar-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-]/g,'_')}`;
+  const {error:upErr} = await supabase.storage.from('avatars').upload(path,file,{upsert:true});
+  if(upErr){alert('Upload failed: '+upErr.message);return;}
+  const {data:pub} = supabase.storage.from('avatars').getPublicUrl(path);
+  const {error} = await supabase.from('profiles').update({avatar_url:pub.publicUrl}).eq('id',state.session.user.id);
+  if(error){alert('Could not save photo: '+error.message);return;}
+  await loadProfile(); render();
+}
+
+async function bootApp(){
+  const {data:{session}} = await supabase.auth.getSession();
+  state.session = session;
+  supabase.auth.onAuthStateChange(async (event,newSession)=>{
+    if(event==='PASSWORD_RECOVERY'){
+      state.session=newSession; state.authView='reset'; renderAuth(); return;
+    }
+    state.session = newSession;
+    if(newSession){
+      await loadProfile();
+      firstLoad=true; loadData();
+    } else {
+      state.profile=null; state.authView='login'; state.authMessage=''; state.authError=''; renderAuth();
+    }
+  });
+  if(session){
+    await loadProfile();
+    loadData();
+  } else {
+    renderAuth();
+  }
+}
+
+bootApp();

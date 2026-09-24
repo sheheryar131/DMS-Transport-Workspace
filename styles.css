@@ -371,3 +371,8 @@ th.col-removable:hover .col-del-x{opacity:1}
 .sil-tab-content{animation:silTabIn .3s var(--ease)}
 @keyframes silTabIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media(max-width:760px){.sil-tabbar{margin:0 -14px 16px;padding:0 14px 4px}}
+
+/* ===== Profile menu dropdown ===== */
+.profile-menu-wrap{position:relative}
+.profile-dropdown{position:absolute;top:calc(100% + 10px);right:0;width:260px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:16px;z-index:60;animation:panelIn .18s var(--ease)}
+.profile-dropdown-head{display:flex;align-items:center;gap:11px;padding-bottom:12px;border-bottom:1px solid var(--line-soft)}
