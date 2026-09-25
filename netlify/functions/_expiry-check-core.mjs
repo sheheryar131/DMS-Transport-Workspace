@@ -112,6 +112,12 @@ export async function runExpiryCheck({ ignoreLog = false, force = false } = {}) 
       await sendEmail(settings.recipient_email, subject, html);
       sentCount++;
       details.push(`${a.vehicle.rego}: ${a.label} in ${a.days} days — emailed`);
+      await sbInsert('notifications', {
+        type: 'vehicle_expiry',
+        title: `${a.vehicle.rego} — ${a.label} expires in ${a.days} days`,
+        body: `Expires ${a.dateVal}. Update this once renewed.`,
+        related_id: a.vehicle.id,
+      });
     } catch (e) {
       details.push(`${a.vehicle.rego}: email failed — ${e}`);
     }

@@ -351,6 +351,16 @@ async function sbUpsert(table, conflictCol, rows) {
   if (!res.ok) throw new Error(`${table} upsert failed: ${await res.text()}`);
 }
 
+async function sbInsert(table, row) {
+  const base = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  await fetch(`${base}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: { apikey: key, authorization: `Bearer ${key}`, 'content-type': 'application/json', prefer: 'return=minimal' },
+    body: JSON.stringify(row),
+  }).catch(() => {});
+}
+
 async function sbUpdate(table, matchCol, matchVal, patch) {
   const base = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -373,7 +383,14 @@ async function route(formId, submissionId, payload) {
     await sbUpsert('transfer_logs', 'source_submission_id', [row]);
     if (row.booking_code) await sbUpdate('bookings', 'booking_code', row.booking_code, { status: 'Completed' });
   } else if (formId === FORM_IDS.INCIDENT) {
-    await sbUpsert('incidents', 'source_submission_id', [mapIncident(payload, formId, submissionId)]);
+    const row = mapIncident(payload, formId, submissionId);
+    await sbUpsert('incidents', 'source_submission_id', [row]);
+    await sbInsert('notifications', {
+      type: 'incident',
+      title: `New incident report${row.staff_name ? ' from ' + row.staff_name : ''}`,
+      body: row.description ? String(row.description).slice(0, 140) : null,
+      related_id: null,
+    });
   } else if (formId === FORM_IDS.ORIENTATION) {
     await sbUpsert('orientation_checklists', 'source_submission_id', [mapOrientation(payload, formId, submissionId)]);
   } else if (formId === FORM_IDS.SIL_MAINTENANCE) {

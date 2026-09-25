@@ -19,6 +19,15 @@ async function sendEmail(to, subject, html) {
   if (!res.ok) throw new Error(`Resend send failed: ${await res.text()}`);
 }
 
+async function sbInsert(table, row) {
+  const base = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  await fetch(`${base}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: { apikey: key, authorization: `Bearer ${key}`, 'content-type': 'application/json', prefer: 'return=minimal' },
+    body: JSON.stringify(row),
+  }).catch(() => {});
+}
+
 export default async (req) => {
   if (req.headers.get('x-webhook-secret') !== process.env.JOTFORM_WEBHOOK_SECRET) {
     return new Response('Unauthorized', { status: 401 });
@@ -41,6 +50,12 @@ export default async (req) => {
   } catch {}
 
   const name = `${record.first_name || ''} ${record.last_name || ''}`.trim() || 'A new user';
+  await sbInsert('notifications', {
+    type: 'new_signup',
+    title: `${name} signed up`,
+    body: email,
+    related_id: record.id,
+  });
   try {
     await sendEmail(
       'transport@dmscare.com.au',

@@ -393,6 +393,17 @@ th.col-removable:hover .col-del-x{opacity:1}
 .pending-approvals{border-top:1px solid var(--line-soft);padding-top:8px}
 .pending-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;font-size:13px}
 
+/* ===== Notification bell ===== */
+.notif-wrap{position:relative}
+.notif-dropdown{position:absolute;top:calc(100% + 10px);right:0;width:320px;max-height:420px;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:16px;z-index:60;animation:panelIn .18s var(--ease)}
+.notif-list{overflow-y:auto;max-height:320px;margin:0 -4px}
+.notif-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line-soft);font-size:13px}
+.notif-row:last-child{border-bottom:0}
+.notif-row.unread{background:var(--teal-tint);border-radius:8px;padding-left:8px;padding-right:8px}
+.notif-row-main{flex:1;min-width:0}
+.notif-actions{display:flex;gap:6px;flex:0 0 auto}
+.notif-dropdown-foot{display:flex;justify-content:space-between;align-items:center;padding-top:10px;margin-top:6px;border-top:1px solid var(--line-soft)}
+
   </style>
 </head>
 <body>
@@ -416,7 +427,8 @@ const pages = {
   astp:['ASTP Staff List','Driver compliance and documents'],
   incidents:['Incident & Hazard Reporting','Open → In Review → Closed'],
   integrations:['Automations','Automated processes running in the background'],
-  sil:['SIL & Care Compliance','Orientation, maintenance, first aid and visitor logs']
+  sil:['SIL & Care Compliance','Orientation, maintenance, first aid and visitor logs'],
+  notifications:['Notifications','Full notification history']
 };
 const navIcons = {
   dashboard:'<svg viewBox="0 0 24 24" class="ic" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>',
@@ -442,7 +454,8 @@ const state = {
   orientation:[], silMaintenance:[], firstAid:[], silVisitors:[], notificationSettings:null,
   feedbackSubs:[], medicationChecks:[], maintenanceRegister:[],
   bookingsShowAll:false, expiryAlertExpanded:false,
-  session:null, profile:null, authView:'login', authMessage:'', authError:'', profileMenuOpen:false, pendingProfiles:[]
+  session:null, profile:null, authView:'login', authMessage:'', authError:'', profileMenuOpen:false, pendingProfiles:[],
+  notifications:[], notifDropdownOpen:false, notifHovering:false
 };
 const editState = {}; // pageKey -> boolean, tracks per-tab edit mode
 
@@ -525,7 +538,7 @@ function shell(body){
     </div>
     <div class="nav-section">${state.appMode==='care'?'Care':'Operations'}</div>
     ${activeNav.map(([id,n])=>`<div class="nav-item ${id===state.current?'active':''}" data-page="${id}">${navIcons[id]}${n}</div>`).join('')}
-  </aside><main class="main"><header class="topbar"><span class="topbar-label">${state.appMode==='care'?'🏠':'🚐'} ${MODE_LABEL[state.appMode]}</span><div class="top-actions"><button class="btn" id="refreshBtn">↻ Refresh</button>${profileMenu()}</div></header>
+  </aside><main class="main"><header class="topbar"><span class="topbar-label">${state.appMode==='care'?'🏠':'🚐'} ${MODE_LABEL[state.appMode]}</span><div class="top-actions">${state.session?bellIcon():''}<button class="btn" id="refreshBtn">↻ Refresh</button>${profileMenu()}</div></header>
   <div class="content"><div class="page-title"><div><h1>${title}</h1><p>${sub}</p></div>${state.current==='bookings'?'<button class="btn primary" id="newBookingBtn">+ New booking</button>':''}</div>
   ${state.error?`<div class="error-banner">${esc(state.error)}</div>`:''}${state.loading?'<div class="loading-bar">Loading live data…</div>':''}${body}</div></main></div>`;
 }
@@ -1446,6 +1459,7 @@ function render(){
   else if(state.current==='astp') body=astpPage();
   else if(state.current==='incidents') body=incidentPage();
   else if(state.current==='sil') body=silPage();
+  else if(state.current==='notifications') body=notificationsPage();
   else body=integrations();
   app.innerHTML=shell(body);
   document.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>{state.current=x.dataset.page;render()});
@@ -1457,6 +1471,33 @@ function render(){
   document.querySelectorAll('[data-sil-tab]').forEach(x=>x.onclick=()=>{state.silActiveTab=x.dataset.silTab;render();});
   document.querySelector('#refreshBtn').onclick=refreshWithSplash;
   document.querySelector('#profileMenuBtn')?.addEventListener('click',(e)=>{e.stopPropagation();state.profileMenuOpen=!state.profileMenuOpen;render();});
+  document.querySelector('#notifWrap')?.addEventListener('mouseenter',async()=>{
+    if(state.notifHovering) return;
+    state.notifHovering=true;
+    await markNotificationsRead(); render();
+  });
+  document.querySelector('#notifWrap')?.addEventListener('mouseleave',()=>{
+    if(!state.notifDropdownOpen){ state.notifHovering=false; render(); }
+  });
+  document.querySelector('#notifBellBtn')?.addEventListener('click',async(e)=>{
+    e.stopPropagation();
+    state.notifDropdownOpen=!state.notifDropdownOpen;
+    if(state.notifDropdownOpen) await markNotificationsRead();
+    render();
+  });
+  if(state.notifDropdownOpen){
+    document.addEventListener('click',function closeNotifDropdown(e){
+      if(!e.target.closest('#notifWrap')){state.notifDropdownOpen=false;document.removeEventListener('click',closeNotifDropdown);render();}
+    });
+  }
+  document.querySelector('#notifSeeAll')?.addEventListener('click',()=>{state.notifDropdownOpen=false;state.notifHovering=false;state.current='notifications';render();});
+  document.querySelector('#notifClearAll')?.addEventListener('click',clearAllNotifications);
+  document.querySelectorAll('[data-notif-clear]').forEach(btn=>btn.onclick=()=>clearNotification(btn.dataset.notifClear));
+  document.querySelectorAll('[data-notif-decline]').forEach(btn=>btn.onclick=()=>clearNotification(btn.dataset.notifDecline));
+  document.querySelectorAll('[data-notif-approve]').forEach(btn=>btn.onclick=()=>{
+    const [notifId,userId]=btn.dataset.notifApprove.split('|');
+    approveFromNotification(notifId,userId);
+  });
   if(state.profileMenuOpen){
     document.addEventListener('click',function closeProfileMenu(e){
       if(!e.target.closest('.profile-menu-wrap')){state.profileMenuOpen=false;document.removeEventListener('click',closeProfileMenu);render();}
@@ -1631,6 +1672,94 @@ async function approveUser(id){
   await loadPendingProfiles(); render();
 }
 
+/* ===================== Notifications ===================== */
+
+async function loadNotifications(){
+  if(!state.session) return;
+  const {data} = await supabase.from('notifications').select('*').order('created_at',{ascending:false}).limit(200);
+  state.notifications = data||[];
+}
+
+async function markNotificationsRead(){
+  const unread = state.notifications.filter(n=>!n.read_at && !n.cleared);
+  if(!unread.length) return;
+  const ids = unread.map(n=>n.id);
+  const {error} = await supabase.from('notifications').update({read_at:new Date().toISOString()}).in('id',ids);
+  if(!error){ const now=new Date().toISOString(); unread.forEach(n=>n.read_at=now); }
+}
+
+async function clearNotification(id){
+  const {error} = await supabase.from('notifications').update({cleared:true}).eq('id',id);
+  if(error){alert('Could not clear: '+error.message);return;}
+  const n = state.notifications.find(x=>x.id===id); if(n) n.cleared=true;
+  render();
+}
+
+async function clearAllNotifications(){
+  const ids = state.notifications.filter(n=>!n.cleared).map(n=>n.id);
+  if(!ids.length) return;
+  const {error} = await supabase.from('notifications').update({cleared:true}).in('id',ids);
+  if(error){alert('Could not clear: '+error.message);return;}
+  state.notifications.forEach(n=>{ if(ids.includes(n.id)) n.cleared=true; });
+  render();
+}
+
+async function approveFromNotification(notifId,userId){
+  await approveUser(userId);
+  await clearNotification(notifId);
+}
+
+function timeAgo(iso){
+  if(!iso) return '';
+  const s = Math.floor((Date.now()-new Date(iso))/1000);
+  if(s<60) return 'just now';
+  if(s<3600) return Math.floor(s/60)+'m ago';
+  if(s<86400) return Math.floor(s/3600)+'h ago';
+  return Math.floor(s/86400)+'d ago';
+}
+
+function notifRow(n){
+  const isSignup = n.type==='new_signup' && !n.cleared;
+  return `<div class="notif-row ${n.read_at?'':'unread'}">
+    <div class="notif-row-main">
+      <strong>${esc(n.title)}</strong>
+      ${n.body?`<div class="muted" style="font-size:12px;margin-top:2px">${esc(n.body)}</div>`:''}
+      <div class="muted" style="font-size:11px;margin-top:3px">${timeAgo(n.created_at)}</div>
+    </div>
+    ${isSignup?`<div class="notif-actions">
+      <button class="btn small primary" data-notif-approve="${n.id}|${n.related_id}">Yes</button>
+      <button class="btn small" data-notif-decline="${n.id}">No</button>
+    </div>`:(n.cleared?'':`<button class="link-btn" data-notif-clear="${n.id}" style="font-size:11px;padding:4px 8px">Clear</button>`)}
+  </div>`;
+}
+
+function bellIcon(){
+  const unreadCount = state.notifications.filter(n=>!n.read_at && !n.cleared).length;
+  const visible = state.notifDropdownOpen || state.notifHovering;
+  const recent = state.notifications.filter(n=>!n.cleared).slice(0,5);
+  return `<div class="notif-wrap" id="notifWrap">
+    <button class="btn" id="notifBellBtn" title="Notifications" style="position:relative">
+      🔔${unreadCount>0?`<span class="pending-badge">${unreadCount}</span>`:''}
+    </button>
+    ${visible?`<div class="notif-dropdown" id="notifDropdown">
+      <div class="answers-title" style="margin:0 0 8px">Notifications</div>
+      <div class="notif-list">
+      ${recent.length?recent.map(notifRow).join(''):'<div class="empty" style="padding:20px 10px">No notifications</div>'}
+      </div>
+      <div class="notif-dropdown-foot">
+        <button class="link-btn" id="notifSeeAll">See all →</button>
+        ${state.notifications.some(n=>!n.cleared)?`<button class="link-btn" id="notifClearAll" style="color:var(--danger)">Clear all</button>`:''}
+      </div>
+    </div>`:''}
+  </div>`;
+}
+
+function notificationsPage(){
+  const all = state.notifications;
+  if(!all.length) return `<div class="panel"><div class="empty">No notifications yet.</div></div>`;
+  return `<div class="panel"><div class="panel-body"><div class="notif-list">${all.map(notifRow).join('')}</div></div></div>`;
+}
+
 function profileMenu(){
   if(!state.session){
     return `<div class="user-chip"><div class="avatar">D</div><span>DMS Workspace</span></div>`;
@@ -1685,8 +1814,45 @@ function pendingApprovalScreen(){
 }
 
 async function bootApp(){
-  // Auth temporarily disabled — loading straight in, no login required.
-  loadData();
+  const {data:{session}} = await supabase.auth.getSession();
+  state.session = session;
+  supabase.auth.onAuthStateChange(async (event,newSession)=>{
+    if(event==='PASSWORD_RECOVERY'){
+      state.session=newSession; state.authView='reset'; renderAuth(); return;
+    }
+    state.session = newSession;
+    if(newSession){
+      await loadProfile();
+      if(!state.profile?.approved){ app.innerHTML=pendingApprovalScreen(); document.querySelector('#pendingLogoutBtn')?.addEventListener('click',()=>supabase.auth.signOut()); return; }
+      await loadPendingProfiles();
+      await loadNotifications();
+      firstLoad=true; loadData();
+      startNotificationPolling();
+    } else {
+      state.profile=null; state.authView='login'; state.authMessage=''; state.authError=''; renderAuth();
+    }
+  });
+  if(session){
+    await loadProfile();
+    if(!state.profile?.approved){ app.innerHTML=pendingApprovalScreen(); document.querySelector('#pendingLogoutBtn')?.addEventListener('click',()=>supabase.auth.signOut()); return; }
+    await loadPendingProfiles();
+    await loadNotifications();
+    loadData();
+    startNotificationPolling();
+  } else {
+    renderAuth();
+  }
+}
+
+let notifPollStarted = false;
+function startNotificationPolling(){
+  if(notifPollStarted) return;
+  notifPollStarted = true;
+  setInterval(async ()=>{
+    if(!state.session) return;
+    await loadNotifications();
+    if(!state.notifDropdownOpen && !state.notifHovering) render();
+  }, 60000);
 }
 
 bootApp();
