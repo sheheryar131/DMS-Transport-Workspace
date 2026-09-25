@@ -1238,8 +1238,10 @@ function renderAuth(){
 
 async function loadProfile(){
   if(!state.session) return;
-  const {data} = await supabase.from('profiles').select('*').eq('id',state.session.user.id).maybeSingle();
+  const {data,error} = await supabase.from('profiles').select('*').eq('id',state.session.user.id).maybeSingle();
+  if(error) console.error('loadProfile error:', error.message, error);
   state.profile = data;
+  state.profileLoadError = error?.message || null;
 }
 
 async function loadPendingProfiles(){
@@ -1398,6 +1400,8 @@ async function handleAvatarUpload(file){
 function pendingApprovalScreen(){
   return authShell(`<h1>Almost there</h1>
     <p>Your account (${esc(state.session?.user?.email||'')}) is waiting for admin approval.</p>
+    ${state.profileLoadError?`<p class="auth-message" style="background:var(--danger-tint);color:var(--danger)">Technical detail: ${esc(state.profileLoadError)}</p>`:''}
+    ${state.profile===null && !state.profileLoadError?`<p class="auth-message" style="background:var(--danger-tint);color:var(--danger)">Technical detail: no profile row was found for this account, and no error was returned — likely an access rule is silently blocking the read.</p>`:''}
     <p class="auth-message">You'll be able to log in the moment an admin approves your access. If you know who that is, feel free to give them a nudge.</p>
     <button class="btn full" id="pendingLogoutBtn">Log out</button>`);
 }
