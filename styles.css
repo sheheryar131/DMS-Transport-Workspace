@@ -374,7 +374,7 @@ th.col-removable:hover .col-del-x{opacity:1}
 
 /* ===== Profile menu dropdown ===== */
 .profile-menu-wrap{position:relative}
-.profile-dropdown{position:absolute;top:calc(100% + 10px);right:0;width:260px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:16px;z-index:60;animation:panelIn .18s var(--ease)}
+.profile-dropdown{position:absolute;top:calc(100% + 10px);right:0;width:260px;max-width:calc(100vw - 24px);background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:16px;z-index:60;animation:panelIn .18s var(--ease);box-sizing:border-box}
 .profile-dropdown-head{display:flex;align-items:center;gap:11px;padding-bottom:12px;border-bottom:1px solid var(--line-soft)}
 
 /* ===== Pending approvals ===== */

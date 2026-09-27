@@ -1093,13 +1093,6 @@ function render(){
     });
   }
   document.querySelector('#avatarUpload')?.addEventListener('change',e=>handleAvatarUpload(e.target.files[0]));
-  document.querySelector('#profileEditForm')?.addEventListener('submit',async e=>{
-    e.preventDefault();
-    const f=Object.fromEntries(new FormData(e.target));
-    const {error}=await supabase.from('profiles').update({first_name:f.first_name,last_name:f.last_name}).eq('id',state.session.user.id);
-    if(error){alert('Could not save: '+error.message);return;}
-    await loadProfile(); state.profileMenuOpen=false; render();
-  });
   document.querySelector('#logoutBtn')?.addEventListener('click',async()=>{
     await supabase.auth.signOut();
   });
@@ -1356,13 +1349,14 @@ function profileMenu(){
     return `<div class="user-chip"><div class="avatar">D</div><span>DMS Workspace</span></div>`;
   }
   const p = state.profile;
-  const name = p?.first_name ? `${p.first_name} ${p.last_name||''}`.trim() : (state.session?.user?.email||'Account');
+  const emailPrefix = state.session?.user?.email?.split('@')[0] || 'Account';
+  const name = p?.first_name ? `${p.first_name} ${p.last_name||''}`.trim() : emailPrefix;
   const initials = (p?.first_name?.[0]||state.session?.user?.email?.[0]||'?').toUpperCase();
   const pending = state.pendingProfiles||[];
   return `<div class="profile-menu-wrap">
     <button class="user-chip" id="profileMenuBtn" style="border:0;background:none;cursor:pointer;position:relative">
       ${p?.avatar_url?`<img src="${esc(p.avatar_url)}" class="avatar" style="object-fit:cover">`:`<div class="avatar">${esc(initials)}</div>`}
-      <span>${esc(p?.first_name||name)}</span>
+      <span>${esc(name)}</span>
       ${pending.length?`<span class="pending-badge">${pending.length}</span>`:''}
     </button>
     ${state.profileMenuOpen?`<div class="profile-dropdown">
@@ -1372,11 +1366,6 @@ function profileMenu(){
       </div>
       <label class="btn small full" style="cursor:pointer;margin:10px 0 4px" for="avatarUpload">📷 Change photo</label>
       <input type="file" id="avatarUpload" accept="image/*" style="display:none">
-      <form id="profileEditForm" style="display:grid;gap:8px;margin-top:6px">
-        <input type="text" name="first_name" placeholder="First name" value="${esc(p?.first_name||'')}" required style="border:1px solid var(--line);border-radius:8px;padding:8px 10px">
-        <input type="text" name="last_name" placeholder="Last name" value="${esc(p?.last_name||'')}" style="border:1px solid var(--line);border-radius:8px;padding:8px 10px">
-        <button class="btn primary small full" type="submit">Save changes</button>
-      </form>
       ${pending.length?`<div class="pending-approvals">
         <div class="answers-title" style="margin:14px 0 8px">Pending approvals (${pending.length})</div>
         ${pending.map(u=>`<div class="pending-row"><span>${esc(u.first_name||'')} ${esc(u.last_name||'')}</span><button class="btn small primary" data-approve-user="${u.id}">Approve</button></div>`).join('')}
