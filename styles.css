@@ -392,3 +392,9 @@ th.col-removable:hover .col-del-x{opacity:1}
 .notif-row-main{flex:1;min-width:0}
 .notif-actions{display:flex;gap:6px;flex:0 0 auto}
 .notif-dropdown-foot{display:flex;justify-content:space-between;align-items:center;padding-top:10px;margin-top:6px;border-top:1px solid var(--line-soft)}
+
+/* ===== Password reveal toggle ===== */
+.pw-field{position:relative;display:flex}
+.pw-field input{width:100%;padding-right:40px !important}
+.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;cursor:pointer;font-size:15px;padding:4px 6px;border-radius:6px;opacity:.7}
+.pw-eye:hover{opacity:1;background:var(--surface-2)}

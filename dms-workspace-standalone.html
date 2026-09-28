@@ -404,6 +404,12 @@ th.col-removable:hover .col-del-x{opacity:1}
 .notif-actions{display:flex;gap:6px;flex:0 0 auto}
 .notif-dropdown-foot{display:flex;justify-content:space-between;align-items:center;padding-top:10px;margin-top:6px;border-top:1px solid var(--line-soft)}
 
+/* ===== Password reveal toggle ===== */
+.pw-field{position:relative;display:flex}
+.pw-field input{width:100%;padding-right:40px !important}
+.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;cursor:pointer;font-size:15px;padding:4px 6px;border-radius:6px;opacity:.7}
+.pw-eye:hover{opacity:1;background:var(--surface-2)}
+
   </style>
 </head>
 <body>
@@ -1546,11 +1552,10 @@ function loginForm(){
   ${state.authError?`<p class="auth-message" style="background:var(--danger-tint);color:var(--danger)">${esc(state.authError)}</p>`:''}
   <form id="loginForm" class="auth-form">
     <label>Email<input type="email" name="email" required autocomplete="email"></label>
-    <label>Password<input type="password" name="password" required autocomplete="current-password"></label>
+    <label>Password<div class="pw-field"><input type="password" name="password" required autocomplete="current-password"><button type="button" class="pw-eye" data-pw-toggle>👁</button></div></label>
     <button class="btn primary full" type="submit">Log in</button>
     <button type="button" class="text-btn" id="gotoForgot">Forgot your password?</button>
-  </form>
-  <div class="auth-foot">Don't have an account yet? <button type="button" class="text-btn" style="padding:0" id="gotoSignup">Sign up</button> — limited to 5 team members.</div>`;
+  </form>`;
 }
 
 function signupForm(){
@@ -1560,7 +1565,7 @@ function signupForm(){
     <label>First name<input type="text" name="first_name" required autocomplete="given-name"></label>
     <label>Last name<input type="text" name="last_name" required autocomplete="family-name"></label>
     <label>Email<input type="email" name="email" required autocomplete="email"></label>
-    <label>Password<input type="password" name="password" required minlength="6" autocomplete="new-password"></label>
+    <label>Password<div class="pw-field"><input type="password" name="password" required minlength="6" autocomplete="new-password"><button type="button" class="pw-eye" data-pw-toggle>👁</button></div></label>
     <button class="btn primary full" type="submit">Sign up</button>
   </form>
   <div class="auth-foot">Already have an account? <button type="button" class="text-btn" style="padding:0" id="gotoLogin">Log in</button></div>`;
@@ -1581,14 +1586,19 @@ function resetForm(){
   return `<h1>Set a new password</h1><p>Choose a new password for your account.</p>
   ${state.authError?`<p class="auth-message" style="background:var(--danger-tint);color:var(--danger)">${esc(state.authError)}</p>`:''}
   <form id="resetForm" class="auth-form">
-    <label>New password<input type="password" name="password" required minlength="6" autocomplete="new-password"></label>
-    <label>Confirm new password<input type="password" name="password2" required minlength="6" autocomplete="new-password"></label>
+    <label>New password<div class="pw-field"><input type="password" name="password" required minlength="6" autocomplete="new-password"><button type="button" class="pw-eye" data-pw-toggle>👁</button></div></label>
+    <label>Confirm new password<div class="pw-field"><input type="password" name="password2" required minlength="6" autocomplete="new-password"><button type="button" class="pw-eye" data-pw-toggle>👁</button></div></label>
     <button class="btn primary full" type="submit">Set new password</button>
   </form>`;
 }
 
 function renderAuth(){
   app.innerHTML = authScreen();
+  document.querySelectorAll('[data-pw-toggle]').forEach(btn=>btn.onclick=()=>{
+    const input = btn.previousElementSibling;
+    input.type = input.type==='password' ? 'text' : 'password';
+    btn.textContent = input.type==='password' ? '👁' : '🙈';
+  });
   document.querySelector('#gotoSignup')?.addEventListener('click',()=>{state.authView='signup';state.authError='';renderAuth();});
   document.querySelector('#gotoLogin')?.addEventListener('click',()=>{state.authView='login';state.authError='';renderAuth();});
   document.querySelector('#gotoLogin2')?.addEventListener('click',()=>{state.authView='login';state.authError='';state.authMessage='';renderAuth();});
@@ -1597,9 +1607,9 @@ function renderAuth(){
   document.querySelector('#loginForm')?.addEventListener('submit',async e=>{
     e.preventDefault(); state.authError='';
     const f=Object.fromEntries(new FormData(e.target));
-    const {error}=await supabase.auth.signInWithPassword({email:f.email,password:f.password});
+    const {data,error}=await supabase.auth.signInWithPassword({email:f.email,password:f.password});
     if(error){state.authError=error.message;renderAuth();return;}
-    // onAuthStateChange handles moving into the app
+    if(data?.session) await enterApp(data.session);
   });
 
   document.querySelector('#signupForm')?.addEventListener('submit',async e=>{
@@ -1806,32 +1816,31 @@ function pendingApprovalScreen(){
     <button class="btn full" id="pendingLogoutBtn">Log out</button>`);
 }
 
+async function enterApp(session){
+  state.session = session;
+  await loadProfile();
+  if(!state.profile?.approved){ app.innerHTML=pendingApprovalScreen(); document.querySelector('#pendingLogoutBtn')?.addEventListener('click',()=>supabase.auth.signOut()); return; }
+  await loadPendingProfiles();
+  await loadNotifications();
+  firstLoad=true; loadData();
+  startNotificationPolling();
+}
+
 async function bootApp(){
   const {data:{session}} = await supabase.auth.getSession();
-  state.session = session;
   supabase.auth.onAuthStateChange(async (event,newSession)=>{
     if(event==='PASSWORD_RECOVERY'){
       state.session=newSession; state.authView='reset'; renderAuth(); return;
     }
-    state.session = newSession;
     if(newSession){
-      await loadProfile();
-      if(!state.profile?.approved){ app.innerHTML=pendingApprovalScreen(); document.querySelector('#pendingLogoutBtn')?.addEventListener('click',()=>supabase.auth.signOut()); return; }
-      await loadPendingProfiles();
-      await loadNotifications();
-      firstLoad=true; loadData();
-      startNotificationPolling();
+      if(state.session?.access_token===newSession.access_token) return; // already handled directly
+      await enterApp(newSession);
     } else {
-      state.profile=null; state.authView='login'; state.authMessage=''; state.authError=''; renderAuth();
+      state.session=null; state.profile=null; state.authView='login'; state.authMessage=''; state.authError=''; renderAuth();
     }
   });
   if(session){
-    await loadProfile();
-    if(!state.profile?.approved){ app.innerHTML=pendingApprovalScreen(); document.querySelector('#pendingLogoutBtn')?.addEventListener('click',()=>supabase.auth.signOut()); return; }
-    await loadPendingProfiles();
-    await loadNotifications();
-    loadData();
-    startNotificationPolling();
+    await enterApp(session);
   } else {
     renderAuth();
   }
