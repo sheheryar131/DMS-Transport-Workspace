@@ -1399,14 +1399,25 @@ function pendingApprovalScreen(){
     <button class="btn full" id="pendingLogoutBtn">Log out</button>`);
 }
 
+let enterAppInFlight = null;
 async function enterApp(session){
-  state.session = session;
-  await loadProfile();
-  if(!state.profile?.approved){ app.innerHTML=pendingApprovalScreen(); document.querySelector('#pendingLogoutBtn')?.addEventListener('click',()=>supabase.auth.signOut()); return; }
-  await loadPendingProfiles();
-  await loadNotifications();
-  firstLoad=true; loadData();
-  startNotificationPolling();
+  // Guard against being called twice nearly simultaneously (once from a
+  // direct post-login call, once from Supabase's own auth-state-change
+  // event, which fires independently and can't be reliably suppressed by
+  // comparing tokens — that comparison races against this function's own
+  // assignment of state.session). If a call is already running, just wait
+  // for it instead of starting a second, overlapping one.
+  if(enterAppInFlight) return enterAppInFlight;
+  enterAppInFlight = (async () => {
+    state.session = session;
+    await loadProfile();
+    if(!state.profile?.approved){ app.innerHTML=pendingApprovalScreen(); document.querySelector('#pendingLogoutBtn')?.addEventListener('click',()=>supabase.auth.signOut()); return; }
+    await loadPendingProfiles();
+    await loadNotifications();
+    firstLoad=true; loadData();
+    startNotificationPolling();
+  })();
+  try { await enterAppInFlight; } finally { enterAppInFlight = null; }
 }
 
 async function bootApp(){
@@ -1416,7 +1427,6 @@ async function bootApp(){
       state.session=newSession; state.authView='reset'; renderAuth(); return;
     }
     if(newSession){
-      if(state.session?.access_token===newSession.access_token) return; // already handled directly
       await enterApp(newSession);
     } else {
       state.session=null; state.profile=null; state.authView='login'; state.authMessage=''; state.authError=''; renderAuth();
