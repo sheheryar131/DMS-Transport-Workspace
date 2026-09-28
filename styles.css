@@ -115,7 +115,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .booked{background:#0086C0}
 .sent-to-driver,.pre-start{background:#A25DDC}
 .completed,.active,.post-shift{background:#00C875}
-.cancelled,.open{background:#E2445C}
+.cancelled,.open,.closed{background:#E2445C}
 .in-review,.needs-review{background:#FFCB00;color:#4B3B00}
 
 .status-select{border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:var(--surface);min-width:130px;cursor:pointer;transition:border-color .15s}
