@@ -45,11 +45,11 @@ function toRawRequest(sub) {
   return out;
 }
 
-async function fetchAllFromJotform(formId) {
+async function fetchAllFromJotform(formId, apiKey) {
   const base = process.env.JOTFORM_API_BASE || 'https://api.jotform.com';
   const all = [];
   for (let offset = 0; offset < 5000; offset += 100) {
-    const url = `${base}/form/${formId}/submissions?apiKey=${encodeURIComponent(process.env.JOTFORM_API_KEY)}&limit=100&offset=${offset}&orderby=created_at&direction=ASC`;
+    const url = `${base}/form/${formId}/submissions?apiKey=${encodeURIComponent(apiKey)}&limit=100&offset=${offset}&orderby=created_at&direction=ASC`;
     const res = await fetch(url);
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.responseCode >= 400) throw new Error(`Jotform API ${res.status}: ${json.message || 'error'}`);
@@ -81,16 +81,17 @@ export default async (req) => {
   const secret = process.env.JOTFORM_WEBHOOK_SECRET;
   if (!secret || req.headers.get('x-webhook-secret') !== secret) return new Response('Unauthorized', { status: 401 });
 
-  const { form } = await req.json().catch(() => ({}));
+  const { form, apiKey: bodyKey } = await req.json().catch(() => ({}));
+  const apiKey = process.env.JOTFORM_API_KEY || (typeof bodyKey === 'string' && /^[a-f0-9]{32}$/i.test(bodyKey) ? bodyKey : '');
   const formId = String(form || '');
   const table = FORM_TABLE[formId];
   if (!table) return Response.json({ ok: false, error: 'Unknown form id' }, { status: 400 });
 
-  const useApi = !!process.env.JOTFORM_API_KEY;
+  const useApi = !!apiKey;
   let items;
   try {
     if (useApi) {
-      const subs = await fetchAllFromJotform(formId);
+      const subs = await fetchAllFromJotform(formId, apiKey);
       items = subs.map((s) => ({ id: s.id, created_at: s.created_at ? new Date(s.created_at.replace(' ', 'T') + 'Z').toISOString() : null, raw: toRawRequest(s) }));
     } else {
       items = await fetchStored(formId);

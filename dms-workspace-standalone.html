@@ -1519,11 +1519,13 @@ async function saveNotificationSettings(e){
 const BACKFILL_FORMS=[['252788179633068','Pre-start'],['253006995325864','Post Shift'],['252950383396870','Booking'],['253346438293867','Booking NDIS/HCP'],['252861403243047','Transport Service Log'],['252867927039067','Incident'],['253298991210866','Worker Orientation'],['260138289199873','SIL/Office Maintenance'],['253227624992060','First Aid'],['260138249053858','SIL Visitor'],['260618231286052','Feedback/Complaints'],['260628723360052','M1 Medication'],['260628687541062','Ad Hoc Maintenance']];
 async function backfillJotform(){
   const out=document.getElementById('backfillResult'), btn=document.getElementById('backfillBtn');
+  let apiKey=''; try{apiKey=sessionStorage.getItem('jfKey')||'';}catch{}
+  if(!apiKey){ apiKey=(prompt('Paste your Jotform API key (Jotform → Settings → API). It is used only for this import and not saved on the server.')||'').trim(); if(!apiKey) return; try{sessionStorage.setItem('jfKey',apiKey);}catch{} }
   if(btn) btn.disabled=true; const lines=[];
   for(const [id,name] of BACKFILL_FORMS){
     if(out) out.textContent=lines.concat([`Importing ${name}…`]).join('\n');
     try{
-      const res=await fetch('/.netlify/functions/jotform-backfill',{method:'POST',headers:{'content-type':'application/json','x-webhook-secret':'29b545104d54fe607afe6f0b6a5f73cd'},body:JSON.stringify({form:id})});
+      const res=await fetch('/.netlify/functions/jotform-backfill',{method:'POST',headers:{'content-type':'application/json','x-webhook-secret':'29b545104d54fe607afe6f0b6a5f73cd'},body:JSON.stringify({form:id,apiKey})});
       const j=await res.json().catch(()=>({error:'HTTP '+res.status}));
       lines.push(j.error&&!j.found&&j.found!==0?`✗ ${name}: ${j.error}`:`${j.ok?'✓':'⚠'} ${name}: ${j.routed}/${j.found} imported (${j.source==='jotform-api'?'from Jotform':'from stored copies only'})${j.errors&&j.errors.length?' — '+j.errors[0]:''}`);
     }catch(e){ lines.push(`✗ ${name}: ${e.message}`); }
