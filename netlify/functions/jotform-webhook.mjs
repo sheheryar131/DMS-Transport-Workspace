@@ -45,8 +45,13 @@ function raw(payload, label) {
 
 function text(v) {
   if (v == null) return null;
-  if (Array.isArray(v)) return v.filter(Boolean).join(', ') || null;
+  if (Array.isArray(v)) return v.map((x) => (Array.isArray(x) || (x && typeof x === 'object') ? text(x) : x)).filter(Boolean).join(', ') || null;
   if (typeof v === 'object') {
+    // Jotform structured answers: full name, address, phone, time
+    if ('first' in v || 'last' in v) return [v.prefix, v.first, v.middle, v.last, v.suffix].filter(Boolean).join(' ').trim() || null;
+    if ('addr_line1' in v || 'addr_line2' in v || 'city' in v) return [v.addr_line1, v.addr_line2, v.city, v.state, v.postal, v.country].filter(Boolean).join(', ') || null;
+    if ('full' in v) return String(v.full || '').trim() || null;
+    if ('timeInput' in v) return [v.timeInput, v.ampm].filter(Boolean).join(' ') || null;
     const vals = Object.entries(v).filter(([k]) => k !== 'other').map(([, x]) => x);
     const other = v.other;
     const joined = [...vals, other].filter(Boolean).join(', ');
@@ -77,6 +82,8 @@ function dateVal(v) {
   }
   const t = text(v);
   if (!t) return null;
+  const slash = String(t).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (slash && Number(slash[2]) <= 12) return `${slash[3]}-${slash[2].padStart(2, '0')}-${slash[1].padStart(2, '0')}`;
   const parsed = new Date(t);
   return isNaN(parsed) ? null : parsed.toISOString().slice(0, 10);
 }
@@ -98,6 +105,22 @@ function timeVal(v) {
   if (/pm/i.test(m[3] || '') && h < 12) h += 12;
   if (/am/i.test(m[3] || '') && h === 12) h = 0;
   return `${String(h).padStart(2, '0')}:${m[2]}`;
+}
+
+// Jotform dates/times typed into forms are Sydney local time. Build a correct absolute ISO timestamp.
+const FORM_TZ = 'Australia/Sydney';
+function tzOffsetMinutes(tz, date) {
+  const dtf = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const p = Object.fromEntries(dtf.formatToParts(date).map((x) => [x.type, x.value]));
+  return (Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - date.getTime()) / 60000;
+}
+export function localToIso(dateStr, timeStr, tz = FORM_TZ) {
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  const [hh, mm] = String(timeStr || '00:00').split(':').map(Number);
+  const guess = Date.UTC(y, m - 1, d, hh || 0, mm || 0);
+  let off = tzOffsetMinutes(tz, new Date(guess));
+  off = tzOffsetMinutes(tz, new Date(guess - off * 60000));
+  return new Date(guess - off * 60000).toISOString();
 }
 
 function field(payload, label, transform = text) {
@@ -158,7 +181,7 @@ function mapBooking(payload, formId, submissionId) {
     source_submission_id: submissionId,
     submission_date: new Date().toISOString(),
     booking_date: field(payload, 'Date of Booking', dateVal) || field(payload, 'Date and Time of Booking', dateVal) || field(payload, 'Booking Date', dateVal),
-    requested_time: field(payload, 'Collection Time', timeVal),
+    requested_time: field(payload, 'Collection Time', timeVal) || (isNdis ? timeVal(raw(payload, 'Booking Date')) : null),
     passenger_name: field(payload, "Passenger's Name") || field(payload, 'Passenger Name'),
     passenger_email: field(payload, 'Email Address') || text(findExactSuffix(payload, 'email308')),
     passenger_phone: field(payload, 'Contact Number'),
@@ -207,7 +230,7 @@ function mapIncident(payload, formId, submissionId) {
       const dt = dateVal(d);
       const tm = timeVal(d);
       if (!dt) return null;
-      return new Date(`${dt}T${tm || '00:00'}:00`).toISOString();
+      return localToIso(dt, tm);
     })(),
     location: field(payload, 'Location of Incident') || text(findExactSuffix(payload, 'address')),
     description: descParts.join(' — ') || null,
@@ -268,7 +291,7 @@ function mapSilVisitor(payload, formId, submissionId) {
     visit_at: (() => {
       const d = raw(payload, 'Date');
       const dt = dateVal(d); const tm = timeVal(d);
-      return dt ? new Date(`${dt}T${tm || '00:00'}:00`).toISOString() : null;
+      return dt ? localToIso(dt, tm) : null;
     })(),
     support_worker_name: field(payload, 'Name of On-Duty Support Worker') || field(payload, 'Support Worker') || text(findCiSuffix(payload, 'supportWorker')),
     payload,
@@ -290,7 +313,7 @@ function mapFeedback(payload, formId, submissionId) {
     name: field(payload, 'Name'),
     email: field(payload, 'Email'),
     phone: field(payload, 'Phone Number'),
-    submitted_date: field(payload, 'Date', dateVal),
+    submitted_date: (() => { const t = text(findExactSuffix(payload, 'typeA')); const m = t && t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); return m ? `${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}` : field(payload, 'Date', dateVal); })(),
     payload,
   };
 }
@@ -300,7 +323,7 @@ function mapMedicationCheck(payload, formId, submissionId) {
     source_form_id: formId, source_submission_id: submissionId,
     participant_name: field(payload, 'Participant name'),
     participant_dob: field(payload, 'Participant Date Of Birth', dateVal),
-    medication_name: field(payload, 'Name of Medication'),
+    medication_name: field(payload, 'Name of Medication') || text(findExactSuffix(payload, 'additionalComments')),
     script_received_dr: field(payload, 'Script Received Dr'),
     script_given_to_pharmacy: field(payload, 'Script Given to Pharmacy'),
     dose: field(payload, 'Dose'),
@@ -308,7 +331,7 @@ function mapMedicationCheck(payload, formId, submissionId) {
     correct_on_pickup: field(payload, 'Correct on Pickup'),
     special_instructions: field(payload, 'Special Instructions From Pharmacist'),
     pack_start_date: field(payload, 'Start Date Of Pack', dateVal),
-    pack_end_date: field(payload, 'End Date Of Pack', dateVal),
+    pack_end_date: field(payload, 'End Date Of Pack', dateVal) || dateVal(findExactSuffix(payload, 'date19')),
     comments: field(payload, 'Any Comments'),
     pickup_date: field(payload, 'Pickup Date', dateVal),
     staff_signature_url: field(payload, 'Signature Of The Staff'),

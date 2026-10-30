@@ -10,7 +10,7 @@
  *  - Otherwise: re-routes whatever raw payloads are already stored in `jotform_submissions`.
  * Set JOTFORM_API_BASE=https://eu-api.jotform.com if the Jotform account is in the EU region.
  */
-import { FORM_IDS, route, sbUpsert } from './jotform-webhook.mjs';
+import { FORM_IDS, route, sbUpsert, localToIso } from './jotform-webhook.mjs';
 
 const FORM_TABLE = {
   [FORM_IDS.PRE_START]: 'vehicle_checks',
@@ -27,6 +27,12 @@ const FORM_TABLE = {
   [FORM_IDS.MEDICATION_CHECK]: 'medication_checks',
   [FORM_IDS.MAINTENANCE_REGISTER]: 'maintenance_register',
 };
+
+// Jotform API timestamps are in the Jotform account's timezone (default America/New_York), not UTC.
+function parseJotformTime(str) {
+  const m = String(str || '').match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
+  return m ? localToIso(m[1], m[2], process.env.JOTFORM_TZ || 'America/New_York') : null;
+}
 
 const sbHeaders = () => {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -60,6 +66,20 @@ async function fetchAllFromJotform(formId, apiKey) {
   return all.filter((s) => s.status !== 'DELETED');
 }
 
+// Save the form's question layout (labels, checklist row names, options) so the app can show proper field names.
+async function syncSchema(formId, apiKey) {
+  const base = process.env.JOTFORM_API_BASE || 'https://api.jotform.com';
+  const res = await fetch(`${base}/form/${formId}/questions?apiKey=${encodeURIComponent(apiKey)}`);
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || json.responseCode >= 400) throw new Error(`Jotform questions ${res.status}: ${json.message || 'error'}`);
+  const out = {};
+  for (const [qid, q] of Object.entries(json.content || {})) {
+    out[qid] = { qid, name: q.name, text: q.text, type: q.type, order: Number(q.order) || 0, mrows: q.mrows, mcolumns: q.mcolumns, options: q.options, inputType: q.inputType };
+  }
+  await sbUpsert('jotform_form_schemas', 'form_id', [{ form_id: formId, questions: out, updated_at: new Date().toISOString() }]);
+  return Object.keys(out).length;
+}
+
 async function fetchStored(formId) {
   const base = process.env.SUPABASE_URL;
   const rows = await fetch(`${base}/rest/v1/jotform_submissions?form_id=eq.${formId}&select=form_id,submission_id,payload,received_at&order=received_at.asc&limit=1000`, { headers: sbHeaders() }).then((r) => r.json());
@@ -72,7 +92,7 @@ async function setCreatedAt(table, submissionId, iso) {
   await fetch(`${base}/rest/v1/${table}?source_submission_id=eq.${encodeURIComponent(submissionId)}`, {
     method: 'PATCH',
     headers: { ...sbHeaders(), prefer: 'return=minimal' },
-    body: JSON.stringify({ created_at: iso }),
+    body: JSON.stringify(table === 'bookings' ? { created_at: iso, submission_date: iso } : { created_at: iso }),
   }).catch(() => {});
 }
 
@@ -89,10 +109,12 @@ export default async (req) => {
 
   const useApi = !!apiKey;
   let items;
+  let schemaQuestions = null;
   try {
     if (useApi) {
+      schemaQuestions = await syncSchema(formId, apiKey).catch((e) => `error: ${String(e).slice(0, 120)}`);
       const subs = await fetchAllFromJotform(formId, apiKey);
-      items = subs.map((s) => ({ id: s.id, created_at: s.created_at ? new Date(s.created_at.replace(' ', 'T') + 'Z').toISOString() : null, raw: toRawRequest(s) }));
+      items = subs.map((s) => ({ id: s.id, created_at: parseJotformTime(s.created_at), raw: toRawRequest(s) }));
     } else {
       items = await fetchStored(formId);
     }
@@ -114,5 +136,5 @@ export default async (req) => {
       errors.push(`${it.id}: ${String(e).slice(0, 160)}`);
     }
   }
-  return Response.json({ ok: errors.length === 0, form: formId, source: useApi ? 'jotform-api' : 'stored', found: items.length, routed, errors: errors.slice(0, 5) });
+  return Response.json({ ok: errors.length === 0, schema: schemaQuestions, form: formId, source: useApi ? 'jotform-api' : 'stored', found: items.length, routed, errors: errors.slice(0, 5) });
 };

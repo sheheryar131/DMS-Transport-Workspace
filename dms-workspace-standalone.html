@@ -410,6 +410,23 @@ th.col-removable:hover .col-del-x{opacity:1}
 .pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;cursor:pointer;font-size:15px;padding:4px 6px;border-radius:6px;opacity:.7}
 .pw-eye:hover{opacity:1;background:var(--surface-2)}
 
+/* submission detail: checklists, meta, long text */
+.sub-meta{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:0 0 10px}
+.sub-meta b{color:var(--text,#1b2140);font-weight:600}
+.answer-value .pre{white-space:pre-wrap;word-break:break-word;line-height:1.5}
+.answer-row.matrix{grid-template-columns:190px 1fr}
+.mx-summary{margin-top:6px;font-weight:500;font-size:11.5px;color:var(--muted)}
+.mx{width:100%;border-collapse:collapse}
+.mx td{padding:5px 0;border-bottom:1px solid var(--line-soft);vertical-align:top}
+.mx tr:last-child td{border-bottom:0}
+.mx-l{padding-right:14px;color:var(--text,#1b2140)}
+.mx-a{white-space:nowrap;text-align:right;width:1%}
+.mx-chip{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;background:#eef0f6;color:#434a6a}
+.mx-chip.yes{background:#dcf5e8;color:#0a7a45}
+.mx-chip.no{background:#fde2e6;color:#c4254a}
+.file-grid{display:flex;flex-wrap:wrap;gap:10px}
+@media (max-width:640px){.answer-row,.answer-row.matrix{grid-template-columns:1fr;gap:4px}}
+
 </style>
 </head>
 <body>
@@ -507,6 +524,7 @@ async function loadData(){
   [state.bookings,state.staff,state.vehicles,state.checks,state.transfers,state.incidents,state.stock,state.astp,state.orientation,state.silMaintenance,state.firstAid,state.silVisitors,state.feedbackSubs,state.medicationChecks,state.maintenanceRegister] = queries.map(q=>q.data||[]);
   const {data:ns} = await supabase.from('notification_settings').select('*').eq('entity_type','vehicle_expiry').maybeSingle();
   state.notificationSettings = ns;
+  try{ const {data:sch}=await supabase.from('jotform_form_schemas').select('form_id,questions'); state.formSchemas=Object.fromEntries((sch||[]).map(r=>[r.form_id,r.questions])); }catch{ state.formSchemas={}; }
   state.loading=false; firstLoad=false; state.refreshedAt=Date.now(); render();
   setTimeout(()=>{ if(state.current==='dashboard') render(); }, 5000);
 }
@@ -923,7 +941,7 @@ function checksPage(){
       {label:'Vehicle', render:(r,e)=>e?eText('vehicle_checks','checks',r.id,'rego',r.rego||vehicleRego(r.vehicle_id)):esc(r.rego||vehicleRego(r.vehicle_id))},
       {label:'Odometer', render:(r,e)=>e?eText('vehicle_checks','checks',r.id,'odometer',r.odometer,{type:'number',cast:'number'}):esc(r.odometer??'—')},
       {label:'Compliance', render:(r,e)=>e?'':complianceBadge(r)},
-      {label:'Comments', render:(r,e)=>e?eText('vehicle_checks','checks',r.id,'comments',r.comments):esc(r.comments||'—')},
+      {label:'Comments', render:(r,e)=>e?eText('vehicle_checks','checks',r.id,'comments',r.comments):esc(truncate(r.comments,60)||'—')},
     ]
   });
 }
@@ -941,6 +959,7 @@ function transfersPage(){
       {label:'Collection', render:(r,e)=>e?(eText('transfer_logs','transfers',r.id,'collection_date',r.collection_date,{type:'date'})+eText('transfer_logs','transfers',r.id,'collection_time',r.collection_time,{type:'time'})):`${fmtDate(r.collection_date)} ${fmtTime(r.collection_time)}`},
       {label:'Pickup', render:(r,e)=>e?eText('transfer_logs','transfers',r.id,'pickup_location',r.pickup_location):esc(r.pickup_location||'—')},
       {label:'Drop-off', render:(r,e)=>e?eText('transfer_logs','transfers',r.id,'dropoff_location',r.dropoff_location):esc(r.dropoff_location||'—')},
+      {label:'Return / Wait', render:(r,e)=>e?eText('transfer_logs','transfers',r.id,'return_booked',r.return_booked):esc([r.return_booked,r.wait_time&&`wait ${r.wait_time}`].filter(Boolean).join(' · ')||'—')},
     ]
   });
 }
@@ -1036,33 +1055,41 @@ function silPage(){
            {label:'Support Worker',render:(r,e)=>e?eText('sil_maintenance_checks','silMaintenance',r.id,'support_worker_name',r.support_worker_name):esc(r.support_worker_name||'—')},
            {label:'Date',render:(r,e)=>e?eText('sil_maintenance_checks','silMaintenance',r.id,'check_date',r.check_date,{type:'date'}):fmtDate(r.check_date)},
            {label:'Outside Notes',render:(r,e)=>e?eText('sil_maintenance_checks','silMaintenance',r.id,'outside_notes',r.outside_notes):esc(truncate(r.outside_notes)||'—')},
-           {label:'Inside Notes',render:(r,e)=>e?eText('sil_maintenance_checks','silMaintenance',r.id,'inside_notes',r.inside_notes):esc(truncate(r.inside_notes)||'—')}]},
+           {label:'Inside Notes',render:(r,e)=>e?eText('sil_maintenance_checks','silMaintenance',r.id,'inside_notes',r.inside_notes):esc(truncate(r.inside_notes)||'—')},
+           {label:'Residents & Pets Notes',render:(r,e)=>e?eText('sil_maintenance_checks','silMaintenance',r.id,'residents_notes',r.residents_notes):esc(truncate(r.residents_notes)||'—')}]},
     {key:'firstAid', title:'First Aid', table:'first_aid_checks',
      cols:[{label:'Staff',render:(r,e)=>e?eText('first_aid_checks','firstAid',r.id,'full_name',r.full_name):esc(r.full_name||'—')},
            {label:'SIL Location',render:(r,e)=>e?eText('first_aid_checks','firstAid',r.id,'sil_location',r.sil_location):esc(r.sil_location||'—')},
-           {label:'Items Used',render:(r,e)=>e?eText('first_aid_checks','firstAid',r.id,'items_used',r.items_used):esc(truncate(r.items_used)||'—')}]},
+           {label:'Items Used',render:(r,e)=>e?eText('first_aid_checks','firstAid',r.id,'items_used',r.items_used):esc(truncate(r.items_used,60)||'—')},
+           {label:'Submitted',render:r=>r.created_at?new Date(r.created_at).toLocaleString('en-AU',{dateStyle:'medium',timeStyle:'short'}):'—'}]},
     {key:'silVisitors', title:'Visitors', table:'sil_visitor_checkins',
      cols:[{label:'Visitor',render:(r,e)=>e?eText('sil_visitor_checkins','silVisitors',r.id,'visitor_name',r.visitor_name):esc(r.visitor_name||'—')},
            {label:'SIL Location',render:(r,e)=>e?eText('sil_visitor_checkins','silVisitors',r.id,'sil_location',r.sil_location):esc(r.sil_location||'—')},
            {label:'Reason',render:(r,e)=>e?eText('sil_visitor_checkins','silVisitors',r.id,'reason_for_visit',r.reason_for_visit):esc(truncate(r.reason_for_visit)||'—')},
            {label:'Duration',render:(r,e)=>e?eText('sil_visitor_checkins','silVisitors',r.id,'duration',r.duration):esc(r.duration||'—')},
+           {label:'Support Worker',render:(r,e)=>e?eText('sil_visitor_checkins','silVisitors',r.id,'support_worker_name',r.support_worker_name):esc(r.support_worker_name||'—')},
            {label:'Date/Time',render:r=>r.visit_at?new Date(r.visit_at).toLocaleString('en-AU'):'—'}]},
     {key:'feedbackSubs', title:'Feedback & Complaints', table:'feedback_submissions',
      cols:[{label:'Type',render:(r,e)=>e?eText('feedback_submissions','feedbackSubs',r.id,'type',r.type):badge(r.type)},
            {label:'Role',render:(r,e)=>e?eText('feedback_submissions','feedbackSubs',r.id,'respondent_role',r.respondent_role):esc(r.respondent_role||'—')},
            {label:'Name',render:(r,e)=>e?eText('feedback_submissions','feedbackSubs',r.id,'name',r.name):esc(r.name||'—')},
-           {label:'Date',render:(r,e)=>e?eText('feedback_submissions','feedbackSubs',r.id,'submitted_date',r.submitted_date,{type:'date'}):fmtDate(r.submitted_date)}]},
+           {label:'Overall Satisfaction',render:(r,e)=>e?eText('feedback_submissions','feedbackSubs',r.id,'overall_satisfaction',r.overall_satisfaction):esc(r.overall_satisfaction||'—')},
+           {label:'Date',render:(r,e)=>e?eText('feedback_submissions','feedbackSubs',r.id,'submitted_date',r.submitted_date,{type:'date'}):fmtDate(r.submitted_date||(r.created_at||'').slice(0,10))}]},
     {key:'medicationChecks', title:'Medication Checks (M1)', table:'medication_checks',
      cols:[{label:'Participant',render:(r,e)=>e?eText('medication_checks','medicationChecks',r.id,'participant_name',r.participant_name):esc(r.participant_name||'—')},
            {label:'Medication',render:(r,e)=>e?eText('medication_checks','medicationChecks',r.id,'medication_name',r.medication_name):esc(r.medication_name||'—')},
-           {label:'Dose',render:(r,e)=>e?eText('medication_checks','medicationChecks',r.id,'dose',r.dose):esc(r.dose||'—')},
+           {label:'Dose',render:(r,e)=>e?eText('medication_checks','medicationChecks',r.id,'dose',r.dose):esc(truncate(r.dose,50)||'—')},
+           {label:'Frequency',render:(r,e)=>e?eText('medication_checks','medicationChecks',r.id,'frequency',r.frequency):esc(truncate(r.frequency,30)||'—')},
+           {label:'Correct on Pickup',render:(r,e)=>e?eText('medication_checks','medicationChecks',r.id,'correct_on_pickup',r.correct_on_pickup):(r.correct_on_pickup?badge(r.correct_on_pickup):'—')},
            {label:'Pickup Date',render:(r,e)=>e?eText('medication_checks','medicationChecks',r.id,'pickup_date',r.pickup_date,{type:'date'}):fmtDate(r.pickup_date)}]},
     {key:'maintenanceRegister', title:'Ad Hoc Maintenance', table:'maintenance_register',
      cols:[{label:'Area / Asset',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'area_asset',r.area_asset):esc(r.area_asset||'—')},
            {label:'Issue',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'issue_identified',r.issue_identified):esc(truncate(r.issue_identified)||'—')},
            {label:'Risk',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'risk_level',r.risk_level):badge(r.risk_level)},
            {label:'Responsible',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'responsible_person',r.responsible_person):esc(r.responsible_person||'—')},
-           {label:'Date Identified',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'date_identified',r.date_identified,{type:'date'}):fmtDate(r.date_identified)}]},
+           {label:'Date Identified',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'date_identified',r.date_identified,{type:'date'}):fmtDate(r.date_identified)},
+           {label:'Action Taken',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'action_taken',r.action_taken):esc(truncate(r.action_taken)||'—')},
+           {label:'Date Completed',render:(r,e)=>e?eText('maintenance_register','maintenanceRegister',r.id,'date_completed',r.date_completed,{type:'date'}):fmtDate(r.date_completed)}]},
   ];
   const activeIdx = sub.findIndex(s=>s.key===(state.silActiveTab||'orientation'));
   const activeI = activeIdx===-1?0:activeIdx;
@@ -1373,28 +1400,134 @@ function complianceBadge(row){
 
 
 
-/* ===================== PDF export (every submission) ===================== */
-function plainValue(v){
-  if(v==null||v==='') return {text:'—',images:[]};
-  const dateStr=formatDateObj(v); if(dateStr) return {text:dateStr,images:[]};
-  if(typeof v==='string') return isImageUrl(v)?{text:'',images:[v]}:{text:v,images:[]};
-  if(Array.isArray(v)){
-    const imgs=v.filter(isImageUrl);
-    const rest=v.filter(x=>x && !isImageUrl(x)).map(x=>typeof x==='object'?Object.values(x).filter(Boolean).join(' '):String(x));
-    return {text:rest.join(', '),images:imgs};
-  }
-  if(typeof v==='object'){
-    if(isMatrixShape(v)){
-      const entries=Object.entries(v).filter(([k])=>k!=='colIds'&&k!=='rowIds'); const counts={}; let answered=0;
-      entries.forEach(([,c])=>{const vals=extractMatrixCellValues(c); if(vals.length) answered++; vals.forEach(x=>{counts[String(x)]=(counts[String(x)]||0)+1;});});
-      const parts=Object.entries(counts).map(([k,c])=>`${k} (${c})`);
-      return {text:(parts.join(', ')||'')+` — ${answered}/${entries.length} items`,images:[]};
-    }
-    const flat=[...Object.entries(v).filter(([k])=>k!=='other').map(([,x])=>x), v.other].filter(x=>x!=null&&x!=='');
-    return {text:flat.filter(x=>!isImageUrl(x)).map(String).join(' '),images:flat.filter(isImageUrl)};
-  }
-  return {text:String(v),images:[]};
+/* ===================== Submission rendering engine (modal + PDF share this) ===================== */
+// Fallback labels for forms whose question layout hasn't been synced from Jotform yet (keyed by form id, then question number).
+const FORM_FIELD_LABELS = {
+  '260138289199873': {q119:'Date',q63:'SIL / Office Location',q67:'Support Worker Name',q69:'Support Worker Signature',q91:'Outside SIL / Office',q122:'Outside — Additional Notes',q123:'Inside SIL / Office',q125:'Inside — Additional Notes',q127:'Residents and Pets',q128:'Residents and Pets — Additional Notes'},
+  '253298991210866': {q60:'Participant Name',q63:'SIL Location',q67:'Support Worker Name',q69:'Support Worker Signature',q76:'Introduction to Colleagues & Participants',q81:'Medication & Handover',q83:'SIL Information & Staff Orientation',q86:'Incident & WHS Policy',q91:'Staff Services & Code of Conduct',q99:'Trainer / Inductor Name',q100:'Trainer / Inductor Signature',q119:'Date',q122:'Additional Notes'},
+  '253227624992060': {q60:'Full Name',q63:'SIL Location',q57:'First Aid Stock Used',q66:'Signature'},
+  '260138249053858': {q60:'Visitor Full Name',q63:'SIL Location',q66:'Signature',q71:'Reason for Visit',q74:'Estimated Duration of Visit',q75:'Date & Time of Visit',q76:'Name of On-Duty Support Worker'},
+  '260628723360052': {q3:'Participant Name',q4:'Participant Date of Birth',q6:'Name of Medication',q7:'Script Received from Doctor',q12:'Script Given to Pharmacy',q13:'Dose',q14:'Frequency',q15:'Correct on Pickup',q16:'Special Instructions from Pharmacist',q18:'Start Date of Pack',q19:'End Date of Pack',q20:'Comments',q21:'Staff Signature',q22:'Pickup Date'},
+  '260628687541062': {q4:'Responsible Person',q5:'Date Identified',q6:'Area / Asset',q7:'Issue Identified',q9:'Risk Level',q10:'Temporary Risk Control Taken',q11:'Action Taken',q12:'Date Completed',q14:'Office Address',q16:'Signature'},
+  '260618231286052': {q3:'This is a',q4:'I am a',q13:'Overall satisfaction',q15:'Communication & support rating',q25:'Date'},
+  '252950383396870': {q80:'Vehicle Requirements',q252:'Quoted Amount ($)',q253:'Passenger Name',q254:'Email Address',q260:'Transport Type',q264:'Payment Method',q265:'Quote Amount ($)',q280:'Quoted Distance (km)',q293:'Terms & Conditions',q297:'Pickup Address',q298:'Drop-off Address',q301:'Contact Number',q302:'Date of Booking',q303:'Collection Time',q304:'Quote Number',q305:'Return Required?',q306:'Wait Time (minutes)',q307:'Wait Time Fee ($)'},
+  '253346438293867': {q29:'Date & Time of Booking',q33:'Return trip required?',q80:'Vehicle Type',q253:'Passenger Name',q257:'Mobility Requirements',q260:'Funding Type',q271:'Pickup Address',q273:'Drop-off Address',q286:'Who is completing this form?',q288:'Return trip required?',q293:'Time',q298:'NDIS Participant Full Name',q299:'NDIS Number',q300:'Participant Date of Birth',q301:'NDIS Plan Management Type',q306:'Invoice Recipient Name',q308:'Invoice Email Address',q333:'Terms & Conditions'},
+};
+function stripHtml(h){return String(h||'').replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&#39;|&rsquo;/g,"'").replace(/\s+/g,' ').trim();}
+function qidOf(key){const m=/^q(\d+)_/.exec(key);return m?m[1]:null;}
+function prettyKey(key){
+  const s=key.replace(/^q\d+_?/,'').replace(/\d+$/,'').replace(/([a-z])([A-Z])/g,'$1 $2').replace(/_/g,' ').trim();
+  return s?s.charAt(0).toUpperCase()+s.slice(1):key;
 }
+function labelOf(formId,key,schema){
+  const qid=qidOf(key); const q=qid&&schema?schema[qid]:null;
+  if(q&&stripHtml(q.text)) return stripHtml(q.text).replace(/:$/,'');
+  if(qid&&FORM_FIELD_LABELS[formId]?.['q'+qid]) return FORM_FIELD_LABELS[formId]['q'+qid];
+  if(FIELD_LABELS[key]) return FIELD_LABELS[key];
+  return prettyKey(key);
+}
+function valueToText(v){
+  if(v==null) return '';
+  if(Array.isArray(v)) return v.map(valueToText).filter(Boolean).join(', ');
+  if(typeof v==='object'){
+    if(v.year||v.month||v.day){
+      const d=formatDateObj(v)||'';
+      const t=(v.hour!=null&&v.hour!=='')?` ${v.hour}:${String(v.min??v.minute??'00').padStart(2,'0')} ${v.ampm||''}`.trimEnd():'';
+      return d+t;
+    }
+    if('first' in v||'last' in v) return [v.prefix,v.first,v.middle,v.last,v.suffix].filter(Boolean).join(' ');
+    if('addr_line1' in v||'addr_line2' in v||'city' in v) return [v.addr_line1,v.addr_line2,v.city,v.state,v.postal,v.country].filter(Boolean).join(', ');
+    if('full' in v) return String(v.full||'');
+    if('timeInput' in v) return [v.timeInput,v.ampm].filter(Boolean).join(' ');
+    const vals=Object.entries(v).filter(([k])=>k!=='other'&&k!=='datetime').map(([,x])=>valueToText(x)).filter(Boolean);
+    if(v.other) vals.push('Other: '+v.other);
+    return vals.join(', ');
+  }
+  return String(v).trim();
+}
+function collectUrls(v,out=[]){
+  if(typeof v==='string'){ if(/^https?:\/\//i.test(v.trim()) && !/\s/.test(v.trim())) out.push(v.trim()); }
+  else if(Array.isArray(v)) v.forEach(x=>collectUrls(x,out));
+  else if(v&&typeof v==='object') Object.values(v).forEach(x=>collectUrls(x,out));
+  return out;
+}
+function toMatrixRows(v,qs){
+  if(Array.isArray(v)&&v.length&&v.every(Array.isArray)) return v;
+  if(qs&&qs.type==='control_matrix'&&v&&typeof v==='object'&&!Array.isArray(v)){
+    return Object.keys(v).filter(k=>/^\d+$/.test(k)).sort((a,b)=>a-b).map(k=>{const c=v[k]; return Array.isArray(c)?c:(c&&typeof c==='object'?Object.values(c):[c]);});
+  }
+  return null;
+}
+const POS_RE=/^(yes|completed|complete|pass|passed|ok|okay|done|compliant|accepted|good|great)$/i;
+const NEG_RE=/^(no|fail|failed|not ok|poor|missing)$/i;
+function chipClass(a){return POS_RE.test(a)?'yes':NEG_RE.test(a)?'no':'';}
+function buildEntries(formId,p,schema){
+  const HIDE=new Set(['formID','submissionID']);
+  const keys=Object.keys(p||{}).filter(k=>!SYSTEM_KEYS.has(k)&&!HIDE.has(k));
+  keys.sort((a,b)=>{
+    const qa=qidOf(a), qb=qidOf(b);
+    const oa=schema&&qa&&schema[qa]?schema[qa].order:Number(qa)||99999, ob=schema&&qb&&schema[qb]?schema[qb].order:Number(qb)||99999;
+    return oa-ob;
+  });
+  const entries=[];
+  for(const k of keys){
+    const v=p[k]; if(v==null||v==='') continue;
+    const qid=qidOf(k); const qs=qid&&schema?schema[qid]:null;
+    const label=labelOf(formId,k,schema);
+    const rows=toMatrixRows(v,qs);
+    if(rows){
+      const labels=qs&&qs.mrows?String(qs.mrows).split('|'):[]; const cols=qs&&qs.mcolumns?String(qs.mcolumns).split('|'):[];
+      const out=rows.map((cell,i)=>{
+        const cells=(Array.isArray(cell)?cell:[cell]); let answer='',col='';
+        for(let j=0;j<cells.length;j++){
+          const c=cells[j]; if(c===''||c==null) continue;
+          answer=valueToText(c);
+          if(cols[j]&&cells.length>1&&cells.length===cols.length&&cols[j].trim().toLowerCase()!==answer.toLowerCase()) col=cols[j].trim();
+          break;
+        }
+        return {label:(labels[i]||'').trim()||`Item ${i+1}`,answer,col};
+      });
+      const counts={}; out.forEach(r=>{ if(r.answer) counts[r.answer]=(counts[r.answer]||0)+1; });
+      const answered=out.filter(r=>r.answer).length;
+      const summary=Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([a,n])=>`${n} ${a}`).join(' · ')+(answered<out.length?` · ${out.length-answered} unanswered`:'');
+      entries.push({label,kind:'matrix',rows:out,summary});
+      continue;
+    }
+    const urls=collectUrls(v);
+    const text=valueToText(v);
+    if(urls.length&&(!text||urls.join(', ')===text||urls.every(u=>text.includes(u)))) { entries.push({label,kind:'files',urls}); continue; }
+    if(!text) continue;
+    entries.push({label,kind:'text',text});
+  }
+  return entries;
+}
+function entryValueHtml(e){
+  if(e.kind==='matrix') return `<table class="mx">${e.rows.map(r=>`<tr><td class="mx-l">${esc(r.label)}</td><td class="mx-a">${r.answer?`<span class="mx-chip ${chipClass(r.answer)}">${esc(r.answer)}</span>${r.col?` <span class="muted">${esc(r.col)}</span>`:''}`:'<span class="muted">—</span>'}</td></tr>`).join('')}</table>`;
+  if(e.kind==='files') return `<div class="file-grid">${e.urls.map(u=>fileLinkChip(u)).join('')}</div>`;
+  return `<div class="pre">${esc(e.text)}</div>`;
+}
+function entriesHtml(entries){
+  return entries.map(e=>`<div class="answer-row${e.kind==='matrix'?' matrix':''}"><div class="answer-label">${esc(e.label)}${e.summary?`<div class="mx-summary">${esc(e.summary)}</div>`:''}</div><div class="answer-value">${entryValueHtml(e)}</div></div>`).join('');
+}
+const HIDDEN_COLUMNS=new Set(['id','extra','payload','created_at','updated_at','source_form_id','source_submission_id','monday_item_id']);
+function columnEntries(row){
+  return Object.entries(row).filter(([k,v])=>!HIDDEN_COLUMNS.has(k)&&v!=null&&v!=='').map(([k,v])=>{
+    const label=k.replace(/_/g,' ').replace(/\burl\b/i,'').replace(/\b\w/g,c=>c.toUpperCase()).trim();
+    const t=String(v);
+    if(/^https?:\/\//i.test(t)) return {label,kind:'files',urls:[t]};
+    if(/_(date|dob)$|^(check_date|booking_date)$/.test(k)&&/^\d{4}-\d{2}-\d{2}$/.test(t)) return {label,kind:'text',text:fmtDate(t)};
+    if(/_at$/.test(k)&&/^\d{4}-\d{2}-\d{2}T/.test(t)) return {label,kind:'text',text:new Date(t).toLocaleString('en-AU')};
+    return {label,kind:'text',text:t};
+  });
+}
+function submissionEntries(row){
+  const p=row.payload||{}; const formId=row.source_form_id||p.formID||'';
+  const schema=state.formSchemas?.[formId]||null;
+  const e=buildEntries(formId,p,schema);
+  return e.length?e:columnEntries(row);
+}
+
+/* ===================== PDF export (every submission) ===================== */
 async function imageToDataUrl(url){
   if(url.startsWith('data:')) return url;
   try{
@@ -1403,45 +1536,57 @@ async function imageToDataUrl(url){
     return await new Promise(res=>{const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=()=>res(null); fr.readAsDataURL(b);});
   }catch{ return null; }
 }
-async function downloadSubmissionPdf(title,row,payload,issues){
+async function downloadSubmissionPdf(title,row,entries,issues){
   const {jsPDF}=await import('https://esm.sh/jspdf@2.5.1');
   const doc=new jsPDF({unit:'pt',format:'a4'});
   const W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight(), M=40, CW=W-2*M;
   let y=0;
   const header=()=>{doc.setFillColor(15,23,66); doc.rect(0,0,W,46,'F'); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('DMS Operations & Compliance Workspace',M,29); y=70;};
   const ensure=h=>{ if(y+h>H-M){doc.addPage(); header();} };
+  const ascii=s=>String(s).replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/[–—]/g,'-').replace(/…/g,'...').replace(/[^\x09\x0A\x0D\x20-\x7E -ÿ]/g,'');
   header();
-  doc.setTextColor(15,23,66); doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.text(title,M,y); y+=20;
+  doc.setTextColor(15,23,66); doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.text(ascii(title),M,y); y+=20;
   doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(110,118,140);
   const when=row.created_at?new Date(row.created_at).toLocaleString('en-AU'):'';
-  doc.text(`Submitted: ${when}   |   Exported: ${new Date().toLocaleString('en-AU')}`,M,y); y+=10;
+  doc.text(`Submitted: ${when}   |   Exported: ${new Date().toLocaleString('en-AU')}`,M,y); y+=12;
+  if(row.source_submission_id){ doc.text(`Submission ID: ${row.source_submission_id}`,M,y); y+=12; }
   doc.setDrawColor(210,214,225); doc.line(M,y,W-M,y); y+=16;
   if(issues&&issues.length){
     ensure(30); doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(200,40,70); doc.text(`${issues.length} compliance issue(s) found`,M,y); y+=14;
     doc.setFont('helvetica','normal'); doc.setTextColor(60,60,70);
-    issues.forEach(i=>{const ls=doc.splitTextToSize(`• ${i.label}: ${i.message}`,CW); ensure(ls.length*12); doc.text(ls,M,y); y+=ls.length*12;}); y+=8;
+    issues.forEach(i=>{const ls=doc.splitTextToSize(ascii(`- ${i.label}: ${i.message}`),CW); ensure(ls.length*12); doc.text(ls,M,y); y+=ls.length*12;}); y+=8;
   }
-  const keys=Object.keys(payload||{}).filter(k=>!SYSTEM_KEYS.has(k));
-  for(const k of keys){
-    const {text,images}=plainValue(payload[k]);
-    ensure(34);
-    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(110,118,140); doc.text(fieldLabel(k).toUpperCase().slice(0,110),M,y); y+=12;
-    doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor(25,30,50);
-    if(text){const ls=doc.splitTextToSize(text,CW); for(const l of ls){ensure(14); doc.text(l,M,y); y+=14;}}
-    for(const u of images){
-      const data=await imageToDataUrl(u);
-      let done=false;
-      if(data){
+  const drawImages=async urls=>{
+    for(const u of urls){
+      const data=await imageToDataUrl(u); let done=false;
+      if(data&&/^data:image\/(png|jpe?g|gif|webp)/i.test(data)){
         try{
           const props=doc.getImageProperties(data); const w=Math.min(220,CW), h=Math.min(120,w*props.height/props.width);
           ensure(h+6); doc.addImage(data,props.fileType||'PNG',M,y,w,h); y+=h+6; done=true;
         }catch{}
       }
-      if(!done){ ensure(14); doc.setTextColor(40,90,200); doc.textWithLink('[image] open in browser',M,y,{url:u}); doc.setTextColor(25,30,50); y+=14; }
+      if(!done){ ensure(14); doc.setFontSize(10); doc.setTextColor(40,90,200); doc.textWithLink(/\.(png|jpe?g|gif|webp)(\?|$)/i.test(u)?'[image] open in browser':'[file] open in browser',M,y,{url:u}); y+=14; }
     }
+  };
+  for(const e of entries){
+    ensure(34);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(110,118,140); doc.text(ascii(e.label).toUpperCase().slice(0,110),M,y);
+    if(e.summary){ doc.setFont('helvetica','normal'); doc.text(ascii(e.summary),W-M,y,{align:'right'}); }
+    y+=13;
+    doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor(25,30,50);
+    if(e.kind==='matrix'){
+      for(const r of e.rows){
+        const ls=doc.splitTextToSize(ascii(r.label),CW-110); const h=Math.max(ls.length*13,13);
+        ensure(h+2); doc.setTextColor(25,30,50); doc.text(ls,M+8,y);
+        if(r.answer){ const c=chipClass(r.answer); doc.setFont('helvetica','bold'); doc.setTextColor(...(c==='yes'?[0,140,80]:c==='no'?[200,40,70]:[60,64,90])); doc.text(ascii(r.answer+(r.col?` (${r.col})`:'')),W-M,y,{align:'right'}); doc.setFont('helvetica','normal'); }
+        else { doc.setTextColor(150,155,170); doc.text('-',W-M,y,{align:'right'}); }
+        y+=h+2;
+      }
+    } else if(e.kind==='files'){ await drawImages(e.urls); }
+    else { for(const l of doc.splitTextToSize(ascii(e.text),CW)){ ensure(14); doc.text(l,M,y); y+=14; } }
     y+=8;
   }
-  if(!keys.length){ doc.setFontSize(10); doc.text('No detailed submission payload stored for this record.',M,y); }
+  if(!entries.length){ doc.setFontSize(10); doc.text('No submission details stored for this record.',M,y); }
   const pages=doc.getNumberOfPages();
   for(let i=1;i<=pages;i++){doc.setPage(i); doc.setFontSize(8); doc.setTextColor(140,146,165); doc.text(`Page ${i} of ${pages}`,W-M,H-18,{align:'right'}); doc.text('Disability Mobility and Services',M,H-18);}
   const safe=title.replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'');
@@ -1458,15 +1603,17 @@ function genericDetailModal(table,id){
     const issues=checkIssues(row);
     return issues.length?`<div class="issue-summary"><strong>⚠ ${issues.length} compliance issue${issues.length===1?'':'s'} found</strong>${issues.map(i=>`<div><b>${esc(i.label)}:</b> ${esc(i.message)}</div>`).join('')}</div>`:(Object.keys(p).length?'<div class="pass-summary"><strong>✓ No compliance issues detected</strong></div>':'');
   })() : '';
-  const rows=Object.keys(p).filter(k=>!SYSTEM_KEYS.has(k))
-    .map(k=>`<div class="answer-row"><div class="answer-label">${esc(fieldLabel(k))}</div><div class="answer-value">${renderPayloadValue(k,p[k])}</div></div>`).join('')||'<div class="empty">No detailed submission payload stored for this record.</div>';
-  document.body.insertAdjacentHTML('beforeend',`<div class="compliance-modal-backdrop" id="genericDetailModal"><div class="compliance-modal"><div class="compliance-head"><div><h3>${titles[table]||'Submission'}</h3></div><button id="closeGenericDetail">×</button></div><div class="compliance-body">${issueSummary}<div class="answers-title">Complete submission</div>${rows}</div><div class="modal-actions" style="padding:14px 22px 20px"><button class="btn primary" id="downloadPdfBtn">⬇ Download PDF</button><button class="btn danger" id="deleteDetailRow">🗑 Delete this record</button></div></div></div>`);
+  const entries=submissionEntries(row);
+  const rows=entries.length?entriesHtml(entries):'<div class="empty">No submission details stored for this record.</div>';
+  const when=row.created_at?new Date(row.created_at).toLocaleString('en-AU'):'';
+  const meta=`<div class="sub-meta"><span>Submitted <b>${esc(when)}</b></span>${row.source_submission_id?`<span>ID <b>${esc(row.source_submission_id)}</b></span>`:''}</div>`;
+  document.body.insertAdjacentHTML('beforeend',`<div class="compliance-modal-backdrop" id="genericDetailModal"><div class="compliance-modal"><div class="compliance-head"><div><h3>${titles[table]||'Submission'}</h3></div><button id="closeGenericDetail">×</button></div><div class="compliance-body">${meta}${issueSummary}<div class="answers-title">Complete submission</div>${rows}</div><div class="modal-actions" style="padding:14px 22px 20px"><button class="btn primary" id="downloadPdfBtn">⬇ Download PDF</button><button class="btn danger" id="deleteDetailRow">🗑 Delete this record</button></div></div></div>`);
   const close=()=>document.querySelector('#genericDetailModal')?.remove();
   document.querySelector('#closeGenericDetail').onclick=close;
   document.querySelector('#genericDetailModal').onclick=e=>{if(e.target.id==='genericDetailModal')close();};
   document.querySelector('#downloadPdfBtn').onclick=async(e)=>{
     const btn=e.currentTarget; const old=btn.textContent; btn.disabled=true; btn.textContent='Preparing PDF…';
-    try{ await downloadSubmissionPdf(titles[table]||'Submission',row,p,table==='checks'?checkIssues(row):null); }
+    try{ await downloadSubmissionPdf(titles[table]||'Submission',row,entries,table==='checks'?checkIssues(row):null); }
     catch(err){ alert('Could not create PDF: '+err.message); }
     btn.disabled=false; btn.textContent=old;
   };
@@ -1529,7 +1676,7 @@ async function backfillJotform(){
     try{
       const res=await fetch('/.netlify/functions/jotform-backfill',{method:'POST',headers:{'content-type':'application/json','x-webhook-secret':'29b545104d54fe607afe6f0b6a5f73cd'},body:JSON.stringify({form:id,apiKey})});
       const j=await res.json().catch(()=>({error:'HTTP '+res.status}));
-      lines.push(j.error&&!j.found&&j.found!==0?`✗ ${name}: ${j.error}`:`${j.ok?'✓':'⚠'} ${name}: ${j.routed}/${j.found} imported (${j.source==='jotform-api'?'from Jotform':'from stored copies only'})${j.errors&&j.errors.length?' — '+j.errors[0]:''}`);
+      lines.push(j.error&&!j.found&&j.found!==0?`✗ ${name}: ${j.error}`:`${j.ok?'✓':'⚠'} ${name}: ${j.routed}/${j.found} imported (${j.source==='jotform-api'?'from Jotform':'from stored copies only'})${typeof j.schema==='number'?`, ${j.schema} questions synced`:(j.schema?` — layout sync ${j.schema}`:'')}${j.errors&&j.errors.length?' — '+j.errors[0]:''}`);
     }catch(e){ lines.push(`✗ ${name}: ${e.message}`); }
   }
   paintBackfill(lines.join('\n')+'\n\nDone.');
