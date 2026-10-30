@@ -1138,7 +1138,18 @@ async function downloadSubmissionPdf(title,row,entries,issues){
   const doc=new jsPDF({unit:'pt',format:'a4'});
   const W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight(), M=40, CW=W-2*M;
   let y=0;
-  const header=()=>{doc.setFillColor(15,23,66); doc.rect(0,0,W,46,'F'); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('DMS Operations & Compliance Workspace',M,29); y=70;};
+  // DMS logo: use the real image when the browser may read it, otherwise draw a clean DMS badge.
+  let logo=null; try{ logo=await imageToDataUrl('https://dmsassistedtransport.com.au/wp-content/uploads/2025/09/favicon-300x300.jpg'); }catch{}
+  if(logo&&!/^data:image\/(png|jpe?g)/i.test(logo)) logo=null;
+  const header=()=>{
+    doc.setFillColor(15,23,66); doc.rect(0,0,W,56,'F');
+    let tx=M;
+    if(logo){ try{ doc.addImage(logo,/png/i.test(logo.slice(0,20))?'PNG':'JPEG',M,8,40,40); tx=M+52; }catch{ logo=null; } }
+    if(!logo){ doc.setFillColor(255,255,255); doc.circle(M+20,28,20,'F'); doc.setTextColor(15,23,66); doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('DMS',M+20,32,{align:'center'}); tx=M+52; }
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('Disability Mobility and Services',tx,25);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(190,198,230); doc.text('Operations & Compliance Workspace',tx,40);
+    y=82;
+  };
   const ensure=h=>{ if(y+h>H-M){doc.addPage(); header();} };
   const ascii=s=>String(s).replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/[–—]/g,'-').replace(/…/g,'...').replace(/[^\x09\x0A\x0D\x20-\x7E -ÿ]/g,'');
   header();
