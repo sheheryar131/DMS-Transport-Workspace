@@ -2129,6 +2129,9 @@ async function bootApp(){
       state.session=newSession; state.authView='reset'; renderAuth(); return;
     }
     if(newSession){
+      // Supabase re-fires SIGNED_IN / TOKEN_REFRESHED whenever the tab regains focus or the token renews.
+      // Those must NOT reload the app: only enter the app when we are not already inside it.
+      if(state.session && state.profile){ state.session=newSession; return; }
       await enterApp(newSession);
     } else {
       state.session=null; state.profile=null; state.authView='login'; state.authMessage=''; state.authError=''; renderAuth();
@@ -2147,8 +2150,14 @@ function startNotificationPolling(){
   notifPollStarted = true;
   setInterval(async ()=>{
     if(!state.session) return;
+    const before=(state.notifications||[]).filter(n=>!n.read_at&&!n.cleared).length+':'+(state.notifications||[]).length;
     await loadNotifications();
-    if(!state.notifDropdownOpen && !state.notifHovering) render();
+    const after=(state.notifications||[]).filter(n=>!n.read_at&&!n.cleared).length+':'+(state.notifications||[]).length;
+    // Only redraw when something actually changed, and never while the user is typing, editing or has a pop-up open.
+    const busy = state.notifDropdownOpen || state.notifHovering || Object.values(editState||{}).some(Boolean)
+      || document.querySelector('.compliance-modal-backdrop,.modal-backdrop,.popped-field')
+      || ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName);
+    if(before!==after && !busy) render();
   }, 60000);
 }
 
