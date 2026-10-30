@@ -1320,11 +1320,30 @@ async function sendTestEmailCheck(){
 
 /* ===================== Render / wiring ===================== */
 
+/* Every form list is shown newest first by the date shown in its Date column (falling back to submission time). */
+const SORT_DATE_FIELDS={
+  checks:['check_date'], transfers:['collection_date'], incidents:['incident_at'], orientation:['check_date'],
+  silMaintenance:['check_date'], firstAid:[], silVisitors:['visit_at'], feedbackSubs:['submitted_date'],
+  medicationChecks:['pickup_date'], maintenanceRegister:['date_identified'], bookings:['booking_date']
+};
+function sortRowsByDate(){
+  for(const [key,fields] of Object.entries(SORT_DATE_FIELDS)){
+    const rows=state[key]; if(!Array.isArray(rows)||rows.length<2) continue;
+    const stamp=r=>{
+      for(const f of fields){ const v=r[f]; if(v){ const t=new Date(String(v).length<=10?v+'T00:00:00':v).getTime(); if(!isNaN(t)) return t; } }
+      const t=new Date(r.created_at||0).getTime(); return isNaN(t)?0:t;
+    };
+    const created=r=>{const t=new Date(r.created_at||0).getTime(); return isNaN(t)?0:t;};
+    rows.sort((a,b)=>(stamp(b)-stamp(a))||(created(b)-created(a)));
+  }
+}
+
 function render(){
   // One-time cleanup of any orphaned popped-out fields left behind by a previous
   // buggy build (they'd sit directly under body, outside #app, and never get
   // cleared since app.innerHTML reassignment only touches elements inside #app).
   document.body.querySelectorAll(':scope > .popped-field').forEach(el=>el.remove());
+  sortRowsByDate();
   let body='';
   if(state.current==='dashboard') body=dashboard();
   else if(state.current==='bookings') body=bookingsPage();
