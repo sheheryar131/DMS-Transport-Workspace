@@ -7,7 +7,7 @@
  * and match on that, the same way `q4_typeA` was resolved to "Vehicle Registration" originally.
  */
 
-const FORM_IDS = {
+export const FORM_IDS = {
   PRE_START: '252788179633068',
   POST_SHIFT: '253006995325864',
   BOOKING: '252950383396870',
@@ -335,7 +335,7 @@ function mapMaintenanceRegister(payload, formId, submissionId) {
 
 // ---- supabase helpers ----
 
-async function sbUpsert(table, conflictCol, rows) {
+export async function sbUpsert(table, conflictCol, rows) {
   const base = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const res = await fetch(`${base}/rest/v1/${table}?on_conflict=${conflictCol}`, {
@@ -371,7 +371,7 @@ async function sbUpdate(table, matchCol, matchVal, patch) {
   });
 }
 
-async function route(formId, submissionId, payload) {
+export async function route(formId, submissionId, payload, opts = {}) {
   if (formId === FORM_IDS.PRE_START) {
     await sbUpsert('vehicle_checks', 'source_submission_id', [{ source_form_id: formId, source_submission_id: submissionId, ...mapVehicleCheck(payload, 'pre_start') }]);
   } else if (formId === FORM_IDS.POST_SHIFT) {
@@ -385,7 +385,7 @@ async function route(formId, submissionId, payload) {
   } else if (formId === FORM_IDS.INCIDENT) {
     const row = mapIncident(payload, formId, submissionId);
     await sbUpsert('incidents', 'source_submission_id', [row]);
-    await sbInsert('notifications', {
+    if (!opts.silent) await sbInsert('notifications', {
       type: 'incident',
       title: `New incident report${row.staff_name ? ' from ' + row.staff_name : ''}`,
       body: row.description ? String(row.description).slice(0, 140) : null,

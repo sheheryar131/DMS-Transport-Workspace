@@ -955,6 +955,82 @@ function complianceBadge(row){
 
 
 
+
+/* ===================== PDF export (every submission) ===================== */
+function plainValue(v){
+  if(v==null||v==='') return {text:'—',images:[]};
+  const dateStr=formatDateObj(v); if(dateStr) return {text:dateStr,images:[]};
+  if(typeof v==='string') return isImageUrl(v)?{text:'',images:[v]}:{text:v,images:[]};
+  if(Array.isArray(v)){
+    const imgs=v.filter(isImageUrl);
+    const rest=v.filter(x=>x && !isImageUrl(x)).map(x=>typeof x==='object'?Object.values(x).filter(Boolean).join(' '):String(x));
+    return {text:rest.join(', '),images:imgs};
+  }
+  if(typeof v==='object'){
+    if(isMatrixShape(v)){
+      const entries=Object.entries(v).filter(([k])=>k!=='colIds'&&k!=='rowIds'); const counts={}; let answered=0;
+      entries.forEach(([,c])=>{const vals=extractMatrixCellValues(c); if(vals.length) answered++; vals.forEach(x=>{counts[String(x)]=(counts[String(x)]||0)+1;});});
+      const parts=Object.entries(counts).map(([k,c])=>`${k} (${c})`);
+      return {text:(parts.join(', ')||'')+` — ${answered}/${entries.length} items`,images:[]};
+    }
+    const flat=[...Object.entries(v).filter(([k])=>k!=='other').map(([,x])=>x), v.other].filter(x=>x!=null&&x!=='');
+    return {text:flat.filter(x=>!isImageUrl(x)).map(String).join(' '),images:flat.filter(isImageUrl)};
+  }
+  return {text:String(v),images:[]};
+}
+async function imageToDataUrl(url){
+  if(url.startsWith('data:')) return url;
+  try{
+    const r=await fetch(url); if(!r.ok) return null;
+    const b=await r.blob();
+    return await new Promise(res=>{const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=()=>res(null); fr.readAsDataURL(b);});
+  }catch{ return null; }
+}
+async function downloadSubmissionPdf(title,row,payload,issues){
+  const {jsPDF}=await import('https://esm.sh/jspdf@2.5.1');
+  const doc=new jsPDF({unit:'pt',format:'a4'});
+  const W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight(), M=40, CW=W-2*M;
+  let y=0;
+  const header=()=>{doc.setFillColor(15,23,66); doc.rect(0,0,W,46,'F'); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('DMS Operations & Compliance Workspace',M,29); y=70;};
+  const ensure=h=>{ if(y+h>H-M){doc.addPage(); header();} };
+  header();
+  doc.setTextColor(15,23,66); doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.text(title,M,y); y+=20;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(110,118,140);
+  const when=row.created_at?new Date(row.created_at).toLocaleString('en-AU'):'';
+  doc.text(`Submitted: ${when}   |   Exported: ${new Date().toLocaleString('en-AU')}`,M,y); y+=10;
+  doc.setDrawColor(210,214,225); doc.line(M,y,W-M,y); y+=16;
+  if(issues&&issues.length){
+    ensure(30); doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(200,40,70); doc.text(`${issues.length} compliance issue(s) found`,M,y); y+=14;
+    doc.setFont('helvetica','normal'); doc.setTextColor(60,60,70);
+    issues.forEach(i=>{const ls=doc.splitTextToSize(`• ${i.label}: ${i.message}`,CW); ensure(ls.length*12); doc.text(ls,M,y); y+=ls.length*12;}); y+=8;
+  }
+  const keys=Object.keys(payload||{}).filter(k=>!SYSTEM_KEYS.has(k));
+  for(const k of keys){
+    const {text,images}=plainValue(payload[k]);
+    ensure(34);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(110,118,140); doc.text(fieldLabel(k).toUpperCase().slice(0,110),M,y); y+=12;
+    doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor(25,30,50);
+    if(text){const ls=doc.splitTextToSize(text,CW); for(const l of ls){ensure(14); doc.text(l,M,y); y+=14;}}
+    for(const u of images){
+      const data=await imageToDataUrl(u);
+      let done=false;
+      if(data){
+        try{
+          const props=doc.getImageProperties(data); const w=Math.min(220,CW), h=Math.min(120,w*props.height/props.width);
+          ensure(h+6); doc.addImage(data,props.fileType||'PNG',M,y,w,h); y+=h+6; done=true;
+        }catch{}
+      }
+      if(!done){ ensure(14); doc.setTextColor(40,90,200); doc.textWithLink('[image] open in browser',M,y,{url:u}); doc.setTextColor(25,30,50); y+=14; }
+    }
+    y+=8;
+  }
+  if(!keys.length){ doc.setFontSize(10); doc.text('No detailed submission payload stored for this record.',M,y); }
+  const pages=doc.getNumberOfPages();
+  for(let i=1;i<=pages;i++){doc.setPage(i); doc.setFontSize(8); doc.setTextColor(140,146,165); doc.text(`Page ${i} of ${pages}`,W-M,H-18,{align:'right'}); doc.text('Disability Mobility and Services',M,H-18);}
+  const safe=title.replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'');
+  doc.save(`${safe}-${(row.created_at||new Date().toISOString()).slice(0,10)}.pdf`);
+}
+
 const DETAIL_TABLE_MAP = {checks:'vehicle_checks',transfers:'transfer_logs',incidents:'incidents',orientation:'orientation_checklists',silMaintenance:'sil_maintenance_checks',firstAid:'first_aid_checks',silVisitors:'sil_visitor_checkins',bookings:'bookings',feedbackSubs:'feedback_submissions',medicationChecks:'medication_checks',maintenanceRegister:'maintenance_register'};
 function genericDetailModal(table,id){
   const source={checks:state.checks,transfers:state.transfers,incidents:state.incidents,orientation:state.orientation,silMaintenance:state.silMaintenance,firstAid:state.firstAid,silVisitors:state.silVisitors,bookings:state.bookings,feedbackSubs:state.feedbackSubs,medicationChecks:state.medicationChecks,maintenanceRegister:state.maintenanceRegister}[table]||[];
@@ -967,10 +1043,16 @@ function genericDetailModal(table,id){
   })() : '';
   const rows=Object.keys(p).filter(k=>!SYSTEM_KEYS.has(k))
     .map(k=>`<div class="answer-row"><div class="answer-label">${esc(fieldLabel(k))}</div><div class="answer-value">${renderPayloadValue(k,p[k])}</div></div>`).join('')||'<div class="empty">No detailed submission payload stored for this record.</div>';
-  document.body.insertAdjacentHTML('beforeend',`<div class="compliance-modal-backdrop" id="genericDetailModal"><div class="compliance-modal"><div class="compliance-head"><div><h3>${titles[table]||'Submission'}</h3></div><button id="closeGenericDetail">×</button></div><div class="compliance-body">${issueSummary}<div class="answers-title">Complete submission</div>${rows}</div><div class="modal-actions" style="padding:14px 22px 20px"><button class="btn danger" id="deleteDetailRow">🗑 Delete this record</button></div></div></div>`);
+  document.body.insertAdjacentHTML('beforeend',`<div class="compliance-modal-backdrop" id="genericDetailModal"><div class="compliance-modal"><div class="compliance-head"><div><h3>${titles[table]||'Submission'}</h3></div><button id="closeGenericDetail">×</button></div><div class="compliance-body">${issueSummary}<div class="answers-title">Complete submission</div>${rows}</div><div class="modal-actions" style="padding:14px 22px 20px"><button class="btn primary" id="downloadPdfBtn">⬇ Download PDF</button><button class="btn danger" id="deleteDetailRow">🗑 Delete this record</button></div></div></div>`);
   const close=()=>document.querySelector('#genericDetailModal')?.remove();
   document.querySelector('#closeGenericDetail').onclick=close;
   document.querySelector('#genericDetailModal').onclick=e=>{if(e.target.id==='genericDetailModal')close();};
+  document.querySelector('#downloadPdfBtn').onclick=async(e)=>{
+    const btn=e.currentTarget; const old=btn.textContent; btn.disabled=true; btn.textContent='Preparing PDF…';
+    try{ await downloadSubmissionPdf(titles[table]||'Submission',row,p,table==='checks'?checkIssues(row):null); }
+    catch(err){ alert('Could not create PDF: '+err.message); }
+    btn.disabled=false; btn.textContent=old;
+  };
   document.querySelector('#deleteDetailRow').onclick=async()=>{
     const realTable = DETAIL_TABLE_MAP[table];
     if(!realTable){alert('Cannot delete: unknown table.');return;}
@@ -991,7 +1073,9 @@ function integrations(){
     <div class="connection"><strong>Vehicle Expiry Alert</strong><span class="ok">Active</span></div>
     <div class="modal-actions" style="justify-content:flex-start;margin:2px 0 16px">
       <button type="button" class="btn primary" id="sendTestEmailBtn">📧 Send test email</button>
+      <button type="button" class="btn" id="backfillBtn">⬇ Import old Jotform submissions</button>
     </div>
+    <div id="backfillResult" class="muted" style="margin:-6px 0 14px;font-size:13px;white-space:pre-wrap"></div>
     <form id="notifSettingsForm" class="form-grid">
       <label class="span-2">Alert Email Interval (days before expiry, comma-separated e.g. 30,14,7)<input name="threshold_days" value="${esc((ns.threshold_days||[]).join(','))}" required></label>
       <div class="span-2 modal-actions"><button class="btn primary" type="submit">Save</button></div>
@@ -1013,6 +1097,23 @@ async function saveNotificationSettings(e){
   if(error){alert('Could not save: '+error.message);return;}
   state.notificationSettings=data;
   alert('Saved.');
+}
+
+const BACKFILL_FORMS=[['252788179633068','Pre-start'],['253006995325864','Post Shift'],['252950383396870','Booking'],['253346438293867','Booking NDIS/HCP'],['252861403243047','Transport Service Log'],['252867927039067','Incident'],['253298991210866','Worker Orientation'],['260138289199873','SIL/Office Maintenance'],['253227624992060','First Aid'],['260138249053858','SIL Visitor'],['260618231286052','Feedback/Complaints'],['260628723360052','M1 Medication'],['260628687541062','Ad Hoc Maintenance']];
+async function backfillJotform(){
+  const out=document.getElementById('backfillResult'), btn=document.getElementById('backfillBtn');
+  if(btn) btn.disabled=true; const lines=[];
+  for(const [id,name] of BACKFILL_FORMS){
+    if(out) out.textContent=lines.concat([`Importing ${name}…`]).join('\n');
+    try{
+      const res=await fetch('/.netlify/functions/jotform-backfill',{method:'POST',headers:{'content-type':'application/json','x-webhook-secret':'29b545104d54fe607afe6f0b6a5f73cd'},body:JSON.stringify({form:id})});
+      const j=await res.json().catch(()=>({error:'HTTP '+res.status}));
+      lines.push(j.error&&!j.found&&j.found!==0?`✗ ${name}: ${j.error}`:`${j.ok?'✓':'⚠'} ${name}: ${j.routed}/${j.found} imported (${j.source==='jotform-api'?'from Jotform':'from stored copies only'})${j.errors&&j.errors.length?' — '+j.errors[0]:''}`);
+    }catch(e){ lines.push(`✗ ${name}: ${e.message}`); }
+  }
+  if(out) out.textContent=lines.join('\n');
+  if(btn) btn.disabled=false;
+  try{ await loadData(); render(); }catch{}
 }
 
 async function sendTestEmailCheck(){
@@ -1104,6 +1205,7 @@ function render(){
   });
   document.querySelector('#notifSettingsForm')?.addEventListener('submit',saveNotificationSettings);
   document.querySelector('#sendTestEmailBtn')?.addEventListener('click',sendTestEmailCheck);
+  document.querySelector('#backfillBtn')?.addEventListener('click',backfillJotform);
   document.querySelector('#showMoreBookings')?.addEventListener('click',()=>{state.bookingsShowAll=true;render();});
   document.querySelector('#showLessBookings')?.addEventListener('click',()=>{state.bookingsShowAll=false;render();});
   document.querySelectorAll('[data-eupload-table]').forEach(el=>el.onchange=()=>handleFileUpload(el));
