@@ -495,6 +495,36 @@ function editablePage({pageKey,title,table,stateKey,cols,addDefaults,rowAttrs}){
 }
 function c_rowClass(r){ return rowStatusClass(r.status); }
 
+/* Kilometres driven for a post-shift check = its odometer minus the odometer on the matching pre-start
+   (same vehicle, most recent pre-start before it, within 48h). */
+function matchingPreStart(row){
+  if(row.check_type!=='post_shift'||!row.rego) return null;
+  const rego=String(row.rego).trim().toLowerCase(); const t=new Date(row.created_at).getTime();
+  let best=null;
+  for(const c of state.checks){
+    if(c.check_type!=='pre_start'||c.odometer==null||!c.rego||String(c.rego).trim().toLowerCase()!==rego) continue;
+    const ct=new Date(c.created_at).getTime();
+    if(ct>t||t-ct>48*3600*1000) continue;
+    if(!best||ct>new Date(best.created_at).getTime()) best=c;
+  }
+  return best;
+}
+function kmsDriven(row){
+  if(row.check_type!=='post_shift'||row.odometer==null) return null;
+  const pre=matchingPreStart(row); if(!pre) return {km:null,reason:'No matching pre-start found'};
+  const km=Number(row.odometer)-Number(pre.odometer);
+  if(km<0) return {km,start:pre.odometer,reason:'End reading is lower than start — check the odometer entries'};
+  if(km>1500) return {km,start:pre.odometer,reason:'Unusually high for one shift — check the odometer entries'};
+  return {km,start:pre.odometer};
+}
+function kmsCell(row){
+  if(row.check_type!=='post_shift') return '<span class="muted">—</span>';
+  const k=kmsDriven(row); if(!k) return '<span class="muted">—</span>';
+  if(k.km==null) return `<span class="muted" title="${esc(k.reason)}">n/a</span>`;
+  if(k.reason) return `<span class="badge open" title="${esc(k.reason)}">⚠ ${k.km} km</span>`;
+  return `<strong>${k.km.toLocaleString('en-AU')} km</strong>`;
+}
+
 function checksPage(){
   return editablePage({
     pageKey:'checks', title:'Daily Vehicle Checks', table:'vehicle_checks', stateKey:'checks',
@@ -506,6 +536,7 @@ function checksPage(){
       {label:'Driver', render:(r,e)=>e?eText('vehicle_checks','checks',r.id,'driver_name',r.driver_name||personName(r.staff_id)):esc(r.driver_name||personName(r.staff_id))},
       {label:'Vehicle', render:(r,e)=>e?eText('vehicle_checks','checks',r.id,'rego',r.rego||vehicleRego(r.vehicle_id)):esc(r.rego||vehicleRego(r.vehicle_id))},
       {label:'Odometer', render:(r,e)=>e?eText('vehicle_checks','checks',r.id,'odometer',r.odometer,{type:'number',cast:'number'}):esc(r.odometer??'—')},
+      {label:'KMs Driven', render:(r,e)=>e?'':kmsCell(r)},
       {label:'Compliance', render:(r,e)=>e?'':complianceBadge(r)},
       {label:'Comments', render:(r,e)=>e?eText('vehicle_checks','checks',r.id,'comments',r.comments):esc(truncate(r.comments,60)||'—')},
     ]
@@ -1165,6 +1196,7 @@ function genericDetailModal(table,id){
   const row=source.find(x=>x.id===id); if(!row)return;
   const titles={checks:row.check_type==='pre_start'?'Pre-start Check':'Post-shift Check',transfers:'Transport Service Log',incidents:'Incident Report',orientation:'Worker Orientation Checklist',silMaintenance:'SIL / Office Maintenance Checklist',firstAid:'First Aid Checklist',silVisitors:'SIL Visitor Check In',bookings:'Booking Submission',feedbackSubs:'Feedback / Complaint',medicationChecks:'M1 Medication Check',maintenanceRegister:'Ad Hoc Maintenance Report'};
   const p=row.payload||{};
+  const kmInfo = table==='checks' && row.check_type==='post_shift' ? (()=>{ const k=kmsDriven(row); if(!k) return ''; return k.km==null?`<div class="sub-meta"><span>KMs driven: <b>n/a</b> — ${esc(k.reason)}</span></div>`:`<div class="sub-meta"><span>KMs driven: <b>${k.km.toLocaleString('en-AU')} km</b> (start ${Number(k.start).toLocaleString('en-AU')} → end ${Number(row.odometer).toLocaleString('en-AU')})${k.reason?' — '+esc(k.reason):''}</span></div>`; })() : '';
   const issueSummary = table==='checks' ? (()=>{
     const issues=checkIssues(row);
     return issues.length?`<div class="issue-summary"><strong>⚠ ${issues.length} compliance issue${issues.length===1?'':'s'} found</strong>${issues.map(i=>`<div><b>${esc(i.label)}:</b> ${esc(i.message)}</div>`).join('')}</div>`:(Object.keys(p).length?'<div class="pass-summary"><strong>✓ No compliance issues detected</strong></div>':'');
@@ -1173,7 +1205,7 @@ function genericDetailModal(table,id){
   const rows=entries.length?entriesHtml(entries):'<div class="empty">No submission details stored for this record.</div>';
   const when=row.created_at?new Date(row.created_at).toLocaleString('en-AU'):'';
   const meta=`<div class="sub-meta"><span>Submitted <b>${esc(when)}</b></span>${row.source_submission_id?`<span>ID <b>${esc(row.source_submission_id)}</b></span>`:''}</div>`;
-  document.body.insertAdjacentHTML('beforeend',`<div class="compliance-modal-backdrop" id="genericDetailModal"><div class="compliance-modal"><div class="compliance-head"><div><h3>${titles[table]||'Submission'}</h3></div><button id="closeGenericDetail">×</button></div><div class="compliance-body">${meta}${issueSummary}<div class="answers-title">Complete submission</div>${rows}</div><div class="modal-actions" style="padding:14px 22px 20px"><button class="btn primary" id="downloadPdfBtn">⬇ Download PDF</button><button class="btn danger" id="deleteDetailRow">🗑 Delete this record</button></div></div></div>`);
+  document.body.insertAdjacentHTML('beforeend',`<div class="compliance-modal-backdrop" id="genericDetailModal"><div class="compliance-modal"><div class="compliance-head"><div><h3>${titles[table]||'Submission'}</h3></div><button id="closeGenericDetail">×</button></div><div class="compliance-body">${meta}${kmInfo}${issueSummary}<div class="answers-title">Complete submission</div>${rows}</div><div class="modal-actions" style="padding:14px 22px 20px"><button class="btn primary" id="downloadPdfBtn">⬇ Download PDF</button><button class="btn danger" id="deleteDetailRow">🗑 Delete this record</button></div></div></div>`);
   const close=()=>document.querySelector('#genericDetailModal')?.remove();
   document.querySelector('#closeGenericDetail').onclick=close;
   document.querySelector('#genericDetailModal').onclick=e=>{if(e.target.id==='genericDetailModal')close();};
